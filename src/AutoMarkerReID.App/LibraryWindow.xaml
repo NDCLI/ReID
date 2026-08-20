@@ -1,0 +1,46 @@
+<Window x:Class="AutoMarkerReID.App.LibraryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Thư viện kết quả" Width="1180" Height="760" MinWidth="820" MinHeight="540"
+        WindowStartupLocation="CenterOwner" KeyDown="OnKeyDown"
+        Background="{StaticResource WindowBackgroundBrush}" Foreground="{StaticResource TextBrush}">
+    <Grid Margin="14">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="285"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <Border Background="{StaticResource PanelBrush}" CornerRadius="8" Padding="8" Margin="0,0,12,0">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="KẾT QUẢ" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" Margin="6"/>
+                <ListBox x:Name="ResultList" SelectionChanged="OnSelectionChanged" Background="Transparent" BorderThickness="0">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="4,5">
+                                <TextBlock Text="{Binding Id}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding DominantQueryId}" Foreground="{StaticResource MutedTextBrush}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <Border Background="#090F1B" CornerRadius="8" ClipToBounds="True">
+                <Viewbox Stretch="Uniform" StretchDirection="DownOnly"
+                         HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Grid x:Name="ImageSurface" MouseLeftButtonUp="OnImageClick">
+                        <Image x:Name="PreviewImage" Stretch="None"/>
+                        <Canvas x:Name="BoxCanvas" Background="Transparent"/>
+                    </Grid>
+                </Viewbox>
+            </Border>
+            <TextBlock x:Name="InfoText" Grid.Row="1" Margin="4,9" Foreground="{StaticResource MutedTextBrush}"/>
+            <WrapPanel Grid.Row="2" HorizontalAlignment="Right">
+                <Button Content="← Trước" Click="OnPrevious"/>
+                <Button Content="Tiếp →" Click="OnNext"/>
+                <Button Content="Copy" Click="OnCopy"/>
+                <Button Content="Xóa" Click="OnDelete"/>
+                <Button Content="Làm mới" Click="OnRefresh"/>
+                <Button Content="Đóng" Click="OnClose"/>
+            </WrapPanel>
+        </Grid>
+    </Grid>
+</Window>

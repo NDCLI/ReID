@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AutoMarkerReID.Application\AutoMarkerReID.Application.csproj" />
+    <ProjectReference Include="..\..\src\AutoMarkerReID.Domain\AutoMarkerReID.Domain.csproj" />
+    <ProjectReference Include="..\..\src\AutoMarkerReID.Imaging\AutoMarkerReID.Imaging.csproj" />
+    <ProjectReference Include="..\..\src\AutoMarkerReID.Inference\AutoMarkerReID.Inference.csproj" />
+    <ProjectReference Include="..\..\src\AutoMarkerReID.Persistence\AutoMarkerReID.Persistence.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

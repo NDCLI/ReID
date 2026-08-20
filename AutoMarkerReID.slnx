@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AutoMarkerReID.App/AutoMarkerReID.App.csproj" />
+    <Project Path="src/AutoMarkerReID.Application/AutoMarkerReID.Application.csproj" />
+    <Project Path="src/AutoMarkerReID.Cli/AutoMarkerReID.Cli.csproj" />
+    <Project Path="src/AutoMarkerReID.Domain/AutoMarkerReID.Domain.csproj" />
+    <Project Path="src/AutoMarkerReID.Imaging/AutoMarkerReID.Imaging.csproj" />
+    <Project Path="src/AutoMarkerReID.Inference/AutoMarkerReID.Inference.csproj" />
+    <Project Path="src/AutoMarkerReID.Persistence/AutoMarkerReID.Persistence.csproj" />
+    <Project Path="src/AutoMarkerReID.Windows/AutoMarkerReID.Windows.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AutoMarkerReID.Tests/AutoMarkerReID.Tests.csproj" />
+  </Folder>
+</Solution>

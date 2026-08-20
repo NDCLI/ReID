@@ -1,0 +1,37 @@
+<Window x:Class="AutoMarkerReID.App.ImageEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Image Editor" Width="1100" Height="760" MinWidth="760" MinHeight="520"
+        WindowStartupLocation="CenterOwner" KeyDown="OnKeyDown"
+        Background="{StaticResource WindowBackgroundBrush}" Foreground="{StaticResource TextBrush}">
+    <Grid Margin="14">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <WrapPanel Margin="0,0,0,10">
+            <RadioButton x:Name="CropMode" Content="Crop" IsChecked="True"/>
+            <RadioButton x:Name="CutMode" Content="Cut-out"/>
+            <Button Content="Hoàn tác" Click="OnUndo"/>
+            <Button Content="Đặt lại" Click="OnReset"/>
+            <Button Content="Ghép trái" Click="OnMergeLeft"/>
+            <Button Content="Ghép phải" Click="OnMergeRight"/>
+        </WrapPanel>
+        <Border Grid.Row="1" Background="#090F1B" CornerRadius="8" ClipToBounds="True">
+            <Viewbox Stretch="Uniform" StretchDirection="DownOnly"
+                     HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Grid x:Name="ImageSurface" MouseLeftButtonDown="OnMouseDown" MouseMove="OnMouseMove" MouseLeftButtonUp="OnMouseUp">
+                    <Image x:Name="PreviewImage" Stretch="None"/>
+                    <Canvas x:Name="Overlay" Background="Transparent">
+                        <Rectangle x:Name="Selection" Visibility="Collapsed" Stroke="#38BDF8" StrokeThickness="2" Fill="#2238BDF8"/>
+                    </Canvas>
+                </Grid>
+            </Viewbox>
+        </Border>
+        <Grid Grid.Row="2" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock x:Name="InfoText" VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="HỦY" Click="OnCancel"/>
+                <Button Content="LƯU" Background="#0284C7" Click="OnSave"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
