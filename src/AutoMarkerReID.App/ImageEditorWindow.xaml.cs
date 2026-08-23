@@ -51,6 +51,7 @@ public partial class ImageEditorWindow : Window
     {
         if (_dragStart is not { } start) return;
         var end = Clamp(e.GetPosition(ImageSurface));
+        var removeVerticalStrip = Math.Abs(end.X - start.X) >= Math.Abs(end.Y - start.Y);
         _dragStart = null;
         ImageSurface.ReleaseMouseCapture();
         Selection.Visibility = Visibility.Collapsed;
@@ -60,7 +61,9 @@ public partial class ImageEditorWindow : Window
         try
         {
             _undo.Push(_current);
-            _current = CropMode.IsChecked == true ? _codec.Crop(_current, box) : ImageEditorOperations.CutOut(_current, box);
+            _current = CropMode.IsChecked == true
+                ? _codec.Crop(_current, box)
+                : ImageEditorOperations.CutOut(_current, box, removeVerticalStrip);
             RefreshImage();
         }
         catch (Exception exception)
@@ -129,10 +132,32 @@ public partial class ImageEditorWindow : Window
 
     private void UpdateSelection(WpfPoint start, WpfPoint end)
     {
-        Canvas.SetLeft(Selection, Math.Min(start.X, end.X));
-        Canvas.SetTop(Selection, Math.Min(start.Y, end.Y));
-        Selection.Width = Math.Abs(end.X - start.X);
-        Selection.Height = Math.Abs(end.Y - start.Y);
+        var left = Math.Min(start.X, end.X);
+        var top = Math.Min(start.Y, end.Y);
+        var width = Math.Abs(end.X - start.X);
+        var height = Math.Abs(end.Y - start.Y);
+
+        // In Cut-out mode, fill the perpendicular axis so the preview makes
+        // the operation obvious: horizontal drag removes a vertical strip,
+        // vertical drag removes a horizontal strip.
+        if (CutMode.IsChecked == true && (width > 0 || height > 0))
+        {
+            if (width >= height)
+            {
+                top = 0;
+                height = _current.Height;
+            }
+            else
+            {
+                left = 0;
+                width = _current.Width;
+            }
+        }
+
+        Canvas.SetLeft(Selection, left);
+        Canvas.SetTop(Selection, top);
+        Selection.Width = width;
+        Selection.Height = height;
         Selection.Visibility = Visibility.Visible;
     }
 }

@@ -13,6 +13,7 @@ internal static partial class NativeMethods
     internal const int WhMouseLl = 14;
     internal const int WmRButtonUp = 0x0205;
     internal const int WmMButtonUp = 0x0208;
+    internal const int SwRestore = 9;
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -40,6 +41,14 @@ internal static partial class NativeMethods
 
     [LibraryImport("user32.dll")]
     internal static partial nint GetForegroundWindow();
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsWindow(nint window);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsIconic(nint window);
 
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -71,13 +80,27 @@ internal static partial class NativeMethods
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
-    internal static partial bool ShowWindow(nint window, int command);
+    internal static partial bool BringWindowToTop(nint window);
 
-    [LibraryImport("dwmapi.dll")]
-    internal static partial int DwmSetWindowAttribute(nint window, int attribute, ref int value, int valueSize);
+    [LibraryImport("user32.dll")]
+    internal static partial nint SetFocus(nint window);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool ShowWindow(nint window, int command);
 
     [LibraryImport("user32.dll")]
     internal static partial uint GetWindowThreadProcessId(nint window, out uint processId);
+
+    [LibraryImport("kernel32.dll")]
+    internal static partial uint GetCurrentThreadId();
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool AttachThreadInput(uint threadIdAttach, uint threadIdAttachTo, [MarshalAs(UnmanagedType.Bool)] bool attach);
+
+    [LibraryImport("dwmapi.dll")]
+    internal static partial int DwmSetWindowAttribute(nint window, int attribute, ref int value, int valueSize);
 
     [LibraryImport("kernel32.dll")]
     internal static partial nint GlobalAlloc(uint flags, nuint bytes);

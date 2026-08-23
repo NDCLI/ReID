@@ -5,13 +5,16 @@ namespace AutoMarkerReID.Imaging;
 
 public static class ImageEditorOperations
 {
-    public static ImageFrame CutOut(ImageFrame image, BoundingBox selection)
+    public static ImageFrame CutOut(ImageFrame image, BoundingBox selection) =>
+        CutOut(image, selection, selection.Width >= selection.Height);
+
+    public static ImageFrame CutOut(ImageFrame image, BoundingBox selection, bool removeVerticalStrip)
     {
         var area = selection.Clamp(image.Width, image.Height);
         if (area.Area == 0) return image;
 
         using var source = MatConversion.ToMat(image);
-        using var result = area.Width >= area.Height
+        using var result = removeVerticalStrip
             ? RemoveVerticalStrip(source, area.X1, area.X2)
             : RemoveHorizontalStrip(source, area.Y1, area.Y2);
         return MatConversion.ToImageFrame(result);

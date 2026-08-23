@@ -41,6 +41,24 @@ public sealed class ImagingTests
     }
 
     [Fact]
+    public void CutOutUsesDragDirectionInsteadOfSelectionAspectRatio()
+    {
+        var image = Gradient(60, 140);
+
+        // A wide selection made with a vertical drag still removes a row strip.
+        var horizontalDrag = ImageEditorOperations.CutOut(
+            image, new BoundingBox(10, 20, 40, 25), removeVerticalStrip: false);
+        // A tall selection made with a horizontal drag still removes a column strip.
+        var verticalDrag = ImageEditorOperations.CutOut(
+            image, new BoundingBox(10, 20, 15, 60), removeVerticalStrip: true);
+
+        Assert.Equal(60, horizontalDrag.Width);
+        Assert.Equal(135, horizontalDrag.Height);
+        Assert.Equal(55, verticalDrag.Width);
+        Assert.Equal(140, verticalDrag.Height);
+    }
+
+    [Fact]
     public void SnapToCardPreservesOuterCardFrameAndClampsToScreenshot()
     {
         var image = CardGrid();

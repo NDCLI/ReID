@@ -27,6 +27,8 @@ public partial class MainWindow : Window, IDisposable
     private readonly IBoxRenderer _boxRenderer;
     private readonly IQueryRepository _queryRepository;
     private readonly Forms.NotifyIcon _trayIcon;
+    private readonly System.Drawing.Icon _trayDrawingIcon;
+    private readonly Forms.ContextMenuStrip _trayMenu;
     private readonly GlobalHotkeyManager _hotkeys = new();
     private readonly GlobalMouseHook _mouseHook = new();
     private readonly List<HotkeyRegistration> _hotkeyRegistrations = [];
@@ -80,7 +82,7 @@ public partial class MainWindow : Window, IDisposable
         });
         _controller.ReviewRequested += OnReviewRequested;
         SourceInitialized += (_, _) => RegisterInputHooks();
-        _trayIcon = CreateTrayIcon();
+        (_trayIcon, _trayDrawingIcon, _trayMenu) = CreateTrayIcon();
     }
 
     protected override void OnClosing(CancelEventArgs e)
@@ -98,12 +100,14 @@ public partial class MainWindow : Window, IDisposable
     {
         _trayIcon.Visible = false;
         _trayIcon.Dispose();
+        _trayMenu.Dispose();
+        _trayDrawingIcon.Dispose();
         _hotkeys.Dispose();
         _mouseHook.Dispose();
         GC.SuppressFinalize(this);
     }
 
-    private Forms.NotifyIcon CreateTrayIcon()
+    private (Forms.NotifyIcon NotifyIcon, System.Drawing.Icon DrawingIcon, Forms.ContextMenuStrip Menu) CreateTrayIcon()
     {
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Hiện ứng dụng", null, (_, _) => Dispatcher.Invoke(ShowFromTray));
@@ -123,15 +127,31 @@ public partial class MainWindow : Window, IDisposable
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Khởi động lại", null, (_, _) => Dispatcher.Invoke(Restart));
         menu.Items.Add("Thoát", null, (_, _) => Dispatcher.Invoke(ExitApplication));
-        var icon = new Forms.NotifyIcon
+        var drawingIcon = LoadApplicationIcon();
+        var notifyIcon = new Forms.NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = drawingIcon,
             Text = "AutoMarker Re-ID",
             ContextMenuStrip = menu,
             Visible = true,
         };
-        icon.DoubleClick += (_, _) => Dispatcher.Invoke(ShowFromTray);
-        return icon;
+        notifyIcon.DoubleClick += (_, _) => Dispatcher.Invoke(ShowFromTray);
+        return (notifyIcon, drawingIcon, menu);
+    }
+
+    private static System.Drawing.Icon LoadApplicationIcon()
+    {
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico");
+        if (File.Exists(iconPath))
+        {
+            using var icon = new System.Drawing.Icon(iconPath);
+            return (System.Drawing.Icon)icon.Clone();
+        }
+
+        if (Environment.ProcessPath is { } executable && System.Drawing.Icon.ExtractAssociatedIcon(executable) is { } associated)
+            return associated;
+
+        return (System.Drawing.Icon)SystemIcons.Application.Clone();
     }
 
     private void OnReviewRequested(object? sender, ReviewRequestedEventArgs args)

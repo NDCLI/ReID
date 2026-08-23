@@ -39,37 +39,43 @@ public sealed class GlobalMouseHook : IDisposable
 
     private nint HookCallback(int code, nint wParam, nint lParam)
     {
-        if (code >= 0 && lParam != 0)
+        try
         {
-            var data = Marshal.PtrToStructure<MouseHookData>(lParam);
-            UpdateForegroundCache();
-            if (wParam.ToInt32() == NativeMethods.WmRButtonUp && _lastBlaze == NativeMethods.GetForegroundWindow() && !IsTaskbar(data.Point))
-                BlazeRightClicked?.Invoke(this, EventArgs.Empty);
-            else if (wParam.ToInt32() == NativeMethods.WmMButtonUp)
-                ToggleBlazeAndExcel();
+            if (code >= 0 && lParam != 0)
+            {
+                var data = Marshal.PtrToStructure<MouseHookData>(lParam);
+                var foreground = NativeMethods.GetForegroundWindow();
+                var processName = GetProcessName(foreground);
+                UpdateForegroundCache(foreground, processName);
+                if (wParam.ToInt32() == NativeMethods.WmRButtonUp && _lastBlaze == foreground && !IsTaskbar(data.Point))
+                    BlazeRightClicked?.Invoke(this, EventArgs.Empty);
+                else if (wParam.ToInt32() == NativeMethods.WmMButtonUp)
+                    ToggleBlazeAndExcel(processName);
+            }
+        }
+        catch (Exception)
+        {
+            // Exceptions must never escape a low-level hook callback or Windows can remove the hook.
         }
         return NativeMethods.CallNextHookEx(_hook, code, wParam, lParam);
     }
 
-    private void UpdateForegroundCache()
+    private void UpdateForegroundCache(nint foreground, string? processName)
     {
-        var foreground = NativeMethods.GetForegroundWindow();
-        var process = ForegroundApplication.ProcessName;
-        if (process?.Contains("blaze", StringComparison.OrdinalIgnoreCase) == true) _lastBlaze = foreground;
-        else if (process?.Equals("EXCEL", StringComparison.OrdinalIgnoreCase) == true) _lastExcel = foreground;
+        if (processName?.Contains("blaze", StringComparison.OrdinalIgnoreCase) == true) _lastBlaze = foreground;
+        else if (processName?.Equals("EXCEL", StringComparison.OrdinalIgnoreCase) == true) _lastExcel = foreground;
     }
 
-    private void ToggleBlazeAndExcel()
+    private void ToggleBlazeAndExcel(string? processName)
     {
-        var process = ForegroundApplication.ProcessName;
-        if (process?.Contains("blaze", StringComparison.OrdinalIgnoreCase) == true)
+        if (processName?.Contains("blaze", StringComparison.OrdinalIgnoreCase) == true)
         {
-            if (_lastExcel == 0) _lastExcel = FindWindow("EXCEL");
+            if (!IsUsableWindow(_lastExcel)) _lastExcel = FindWindow("EXCEL");
             Activate(_lastExcel);
         }
-        else if (process?.Equals("EXCEL", StringComparison.OrdinalIgnoreCase) == true)
+        else if (processName?.Equals("EXCEL", StringComparison.OrdinalIgnoreCase) == true)
         {
-            if (_lastBlaze == 0) _lastBlaze = FindWindow("blaze");
+            if (!IsUsableWindow(_lastBlaze)) _lastBlaze = FindWindow("blaze");
             Activate(_lastBlaze);
         }
     }
@@ -80,8 +86,19 @@ public sealed class GlobalMouseHook : IDisposable
         {
             using (process)
             {
-                if (process.MainWindowHandle != 0 && process.ProcessName.Contains(processName, StringComparison.OrdinalIgnoreCase))
-                    return process.MainWindowHandle;
+                try
+                {
+                    if (process.MainWindowHandle != 0 && process.ProcessName.Contains(processName, StringComparison.OrdinalIgnoreCase))
+                        return process.MainWindowHandle;
+                }
+                catch (InvalidOperationException)
+                {
+                    // The process may exit while the process list is being inspected.
+                }
+                catch (Win32Exception)
+                {
+                    // Ignore protected processes that cannot be queried.
+                }
             }
         }
         return 0;
@@ -89,9 +106,52 @@ public sealed class GlobalMouseHook : IDisposable
 
     private static void Activate(nint window)
     {
-        if (window == 0) return;
-        NativeMethods.ShowWindow(window, 9);
-        NativeMethods.SetForegroundWindow(window);
+        if (!IsUsableWindow(window)) return;
+
+        if (NativeMethods.IsIconic(window))
+            NativeMethods.ShowWindow(window, NativeMethods.SwRestore);
+
+        var currentThread = NativeMethods.GetCurrentThreadId();
+        var foreground = NativeMethods.GetForegroundWindow();
+        var foregroundThread = foreground == 0 ? 0 : NativeMethods.GetWindowThreadProcessId(foreground, out _);
+        var targetThread = NativeMethods.GetWindowThreadProcessId(window, out _);
+        var attachedForeground = foregroundThread != 0 && foregroundThread != currentThread &&
+                                 NativeMethods.AttachThreadInput(currentThread, foregroundThread, true);
+        var attachedTarget = targetThread != 0 && targetThread != currentThread && targetThread != foregroundThread &&
+                             NativeMethods.AttachThreadInput(currentThread, targetThread, true);
+        try
+        {
+            NativeMethods.BringWindowToTop(window);
+            NativeMethods.SetForegroundWindow(window);
+            NativeMethods.SetFocus(window);
+        }
+        finally
+        {
+            if (attachedTarget) NativeMethods.AttachThreadInput(currentThread, targetThread, false);
+            if (attachedForeground) NativeMethods.AttachThreadInput(currentThread, foregroundThread, false);
+        }
+    }
+
+    private static bool IsUsableWindow(nint window) => window != 0 && NativeMethods.IsWindow(window);
+
+    private static string? GetProcessName(nint window)
+    {
+        if (window == 0) return null;
+        NativeMethods.GetWindowThreadProcessId(window, out var processId);
+        if (processId == 0) return null;
+        try
+        {
+            using var process = Process.GetProcessById((int)processId);
+            return process.ProcessName;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     private static bool IsTaskbar(NativePoint point)
