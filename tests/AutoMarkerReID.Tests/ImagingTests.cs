@@ -5,6 +5,27 @@ namespace AutoMarkerReID.Tests;
 
 public sealed class ImagingTests
 {
+    [Theory]
+    [InlineData(-50.0, 20.2, 700.0, 300.1, 0, 20, 640, 301)]
+    [InlineData(700.0, 300.1, -50.0, 20.2, 0, 20, 640, 301)]
+    [InlineData(10.8, 20.2, 30.1, 40.01, 10, 20, 31, 41)]
+    [InlineData(0.0, 0.0, 640.0, 480.0, 0, 0, 640, 480)]
+    public void SelectionBoundsClampNormalizeAndUseExclusivePixelEndpoints(
+        double startX,
+        double startY,
+        double endX,
+        double endY,
+        int expectedX1,
+        int expectedY1,
+        int expectedX2,
+        int expectedY2)
+    {
+        var actual = ImageEditorOperations.SelectionBounds(
+            startX, startY, endX, endY, 640, 480);
+
+        Assert.Equal(new BoundingBox(expectedX1, expectedY1, expectedX2, expectedY2), actual);
+    }
+
     [Fact]
     public void CropValidationHashesAndLbpAreStableForValidPortrait()
     {
@@ -56,6 +77,22 @@ public sealed class ImagingTests
         Assert.Equal(135, horizontalDrag.Height);
         Assert.Equal(55, verticalDrag.Width);
         Assert.Equal(140, verticalDrag.Height);
+    }
+
+    [Fact]
+    public void CutOutAcceptsZeroPerpendicularDimensionOutsideImage()
+    {
+        var image = Gradient(60, 140);
+
+        var verticalStrip = ImageEditorOperations.CutOut(
+            image, new BoundingBox(10, 0, 20, 0), removeVerticalStrip: true);
+        var horizontalStrip = ImageEditorOperations.CutOut(
+            image, new BoundingBox(0, 20, 0, 40), removeVerticalStrip: false);
+
+        Assert.Equal(50, verticalStrip.Width);
+        Assert.Equal(140, verticalStrip.Height);
+        Assert.Equal(60, horizontalStrip.Width);
+        Assert.Equal(120, horizontalStrip.Height);
     }
 
     [Fact]

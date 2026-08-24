@@ -4,7 +4,6 @@
         Title="Chỉnh sửa ảnh" Width="1100" Height="760" MinWidth="760" MinHeight="520"
         WindowStartupLocation="CenterOwner" KeyDown="OnKeyDown"
         PreviewMouseMove="OnMouseMove" PreviewMouseLeftButtonUp="OnMouseUp"
-        LostMouseCapture="OnLostMouseCapture"
         Background="{StaticResource WindowBackgroundBrush}" Foreground="{StaticResource TextBrush}">
     <Grid Margin="14">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>

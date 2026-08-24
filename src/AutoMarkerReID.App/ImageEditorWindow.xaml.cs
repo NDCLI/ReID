@@ -21,6 +21,7 @@ public partial class ImageEditorWindow : Window
     private readonly Stack<ImageFrame> _undo = [];
     private ImageFrame _current;
     private WpfPoint? _dragStart;
+    private WpfPoint _lastDragPos;
 
     public ImageEditorWindow(ImageFrame image, IImageCodec codec)
     {
@@ -36,33 +37,39 @@ public partial class ImageEditorWindow : Window
 
     private void OnMouseDown(object sender, MouseButtonEventArgs e)
     {
-        // Receive the drag from the whole preview viewport, then clamp the
-        // coordinates back to the image just like the legacy canvas editor.
-        // This lets users start or finish the gesture outside the image.
-        _dragStart = Clamp(e.GetPosition(ImageSurface));
-        Mouse.Capture(this, CaptureMode.SubTree);
-        UpdateSelection(_dragStart.Value, _dragStart.Value);
+        var raw = e.GetPosition(Overlay);
+        if (!Mouse.Capture(EditorViewport, CaptureMode.Element)) return;
+
+        _dragStart = raw;
+        _lastDragPos = raw;
+        UpdateSelection(raw, raw);
         e.Handled = true;
     }
 
     private void OnMouseMove(object sender, WpfMouseEventArgs e)
     {
         if (_dragStart is { } start && e.LeftButton == MouseButtonState.Pressed)
-            UpdateSelection(start, Clamp(e.GetPosition(ImageSurface)));
+        {
+            _lastDragPos = e.GetPosition(Overlay);
+            UpdateSelection(start, _lastDragPos);
+        }
     }
 
     private void OnMouseUp(object sender, MouseButtonEventArgs e)
     {
         if (_dragStart is not { } start) return;
-        var end = Clamp(e.GetPosition(ImageSurface));
-        var removeVerticalStrip = Math.Abs(end.X - start.X) > Math.Abs(end.Y - start.Y);
+        var end = e.GetPosition(Overlay);
+        FinishDrag(start, end);
+    }
+
+    private void FinishDrag(WpfPoint start, WpfPoint end)
+    {
         _dragStart = null;
         Mouse.Capture(null);
         Selection.Visibility = Visibility.Collapsed;
-        var box = new BoundingBox((int)Math.Min(start.X, end.X), (int)Math.Min(start.Y, end.Y),
-            (int)Math.Max(start.X, end.X), (int)Math.Max(start.Y, end.Y));
-        // Cut-out follows the drag direction: a short movement in the other
-        // axis is enough to select a strip, matching the legacy editor.
+        var box = ImageEditorOperations.SelectionBounds(
+            start.X, start.Y, end.X, end.Y, _current.Width, _current.Height);
+        var removeVerticalStrip = Math.Abs(end.X - start.X) > Math.Abs(end.Y - start.Y);
         if (CutMode.IsChecked != true && (box.Width < 5 || box.Height < 5)) return;
         if (CutMode.IsChecked == true && box.Width < 5 && box.Height < 5) return;
         try
@@ -80,11 +87,11 @@ public partial class ImageEditorWindow : Window
         }
     }
 
-    private void OnLostMouseCapture(object sender, WpfMouseEventArgs e)
+    protected override void OnLostMouseCapture(WpfMouseEventArgs e)
     {
-        if (_dragStart is null) return;
-        _dragStart = null;
-        Selection.Visibility = Visibility.Collapsed;
+        base.OnLostMouseCapture(e);
+        if (_dragStart is not { } start) return;
+        FinishDrag(start, _lastDragPos);
     }
 
     private void OnUndo(object sender, RoutedEventArgs e)
@@ -128,7 +135,12 @@ public partial class ImageEditorWindow : Window
         else if ((e.Key == Key.S && Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) || e.Key == Key.Enter) { OnSave(sender, e); e.Handled = true; }
         else if (e.Key == Key.Escape)
         {
-            if (_dragStart is not null) { _dragStart = null; Selection.Visibility = Visibility.Collapsed; Mouse.Capture(null); }
+            if (_dragStart is not null)
+            {
+                _dragStart = null;
+                Selection.Visibility = Visibility.Collapsed;
+                Mouse.Capture(null);
+            }
             else OnCancel(sender, e);
             e.Handled = true;
         }
@@ -146,10 +158,13 @@ public partial class ImageEditorWindow : Window
 
     private void UpdateSelection(WpfPoint start, WpfPoint end)
     {
-        var left = Math.Min(start.X, end.X);
-        var top = Math.Min(start.Y, end.Y);
-        var width = Math.Abs(end.X - start.X);
-        var height = Math.Abs(end.Y - start.Y);
+        // Clamp to image bounds for display only (the actual crop uses SelectionBounds).
+        var cs = Clamp(start);
+        var ce = Clamp(end);
+        var left = Math.Min(cs.X, ce.X);
+        var top = Math.Min(cs.Y, ce.Y);
+        var width = Math.Abs(ce.X - cs.X);
+        var height = Math.Abs(ce.Y - cs.Y);
 
         // In Cut-out mode, fill the perpendicular axis so the preview makes
         // the operation obvious: horizontal drag removes a vertical strip,

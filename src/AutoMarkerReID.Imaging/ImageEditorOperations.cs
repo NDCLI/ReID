@@ -5,13 +5,44 @@ namespace AutoMarkerReID.Imaging;
 
 public static class ImageEditorOperations
 {
+    public static BoundingBox SelectionBounds(
+        double startX,
+        double startY,
+        double endX,
+        double endY,
+        int imageWidth,
+        int imageHeight)
+    {
+        var left = Math.Clamp(Math.Min(startX, endX), 0, imageWidth);
+        var top = Math.Clamp(Math.Min(startY, endY), 0, imageHeight);
+        var right = Math.Clamp(Math.Max(startX, endX), 0, imageWidth);
+        var bottom = Math.Clamp(Math.Max(startY, endY), 0, imageHeight);
+
+        return new BoundingBox(
+            (int)Math.Floor(left),
+            (int)Math.Floor(top),
+            (int)Math.Ceiling(right),
+            (int)Math.Ceiling(bottom));
+    }
+
     public static ImageFrame CutOut(ImageFrame image, BoundingBox selection) =>
         CutOut(image, selection, selection.Width >= selection.Height);
 
     public static ImageFrame CutOut(ImageFrame image, BoundingBox selection, bool removeVerticalStrip)
     {
         var area = selection.Clamp(image.Width, image.Height);
-        if (area.Area == 0) return image;
+        // For vertical strip removal only the X range matters;
+        // for horizontal strip removal only the Y range matters.
+        // Do not reject based on Area (which is W*H): a drag that
+        // crosses the image only in one axis is valid for cut-out.
+        if (removeVerticalStrip)
+        {
+            if (area.X2 - area.X1 < 1) return image;
+        }
+        else
+        {
+            if (area.Y2 - area.Y1 < 1) return image;
+        }
 
         using var source = MatConversion.ToMat(image);
         using var result = removeVerticalStrip
