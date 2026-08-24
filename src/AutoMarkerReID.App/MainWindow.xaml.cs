@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using AutoMarkerReID.Application;
@@ -27,7 +28,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly IBoxRenderer _boxRenderer;
     private readonly IQueryRepository _queryRepository;
     private readonly Forms.NotifyIcon _trayIcon;
-    private readonly System.Drawing.Icon _trayDrawingIcon;
+    private System.Drawing.Icon _trayDrawingIcon;
     private readonly Forms.ContextMenuStrip _trayMenu;
     private readonly GlobalHotkeyManager _hotkeys = new();
     private readonly GlobalMouseHook _mouseHook = new();
@@ -74,8 +75,8 @@ public partial class MainWindow : Window, IDisposable
         viewModel.HotkeyDetailsRequested += (_, _) => ShowHotkeyDetails();
         viewModel.SelectionFeedback += (_, message) => ShowOsd(message);
         viewModel.ConfirmCacheRebuild = () => DarkMessageBox.Show(this,
-            "Xóa và tạo lại toàn bộ cache feature/OCR? Ảnh Query sẽ được giữ nguyên.",
-            "Làm mới OCR", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes;
+            "Tạo lại toàn bộ dữ liệu đặc trưng nhận diện và OCR? Ảnh tham chiếu trong Query vẫn được giữ nguyên.",
+            "Tạo lại dữ liệu AI", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes;
         viewModel.ActivityLog.CollectionChanged += (_, _) => Dispatcher.InvokeAsync(() =>
         {
             if (LogList.Items.Count > 0) LogList.ScrollIntoView(LogList.Items[^1]);
@@ -83,6 +84,8 @@ public partial class MainWindow : Window, IDisposable
         _controller.ReviewRequested += OnReviewRequested;
         SourceInitialized += (_, _) => RegisterInputHooks();
         (_trayIcon, _trayDrawingIcon, _trayMenu) = CreateTrayIcon();
+        _controller.StateChanged += OnTrayStateChanged;
+        UpdateTrayState(_controller.State, null);
     }
 
     protected override void OnClosing(CancelEventArgs e)
@@ -99,6 +102,7 @@ public partial class MainWindow : Window, IDisposable
     public void Dispose()
     {
         _trayIcon.Visible = false;
+        _controller.StateChanged -= OnTrayStateChanged;
         _trayIcon.Dispose();
         _trayMenu.Dispose();
         _trayDrawingIcon.Dispose();
@@ -110,10 +114,10 @@ public partial class MainWindow : Window, IDisposable
     private (Forms.NotifyIcon NotifyIcon, System.Drawing.Icon DrawingIcon, Forms.ContextMenuStrip Menu) CreateTrayIcon()
     {
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add("Hiện ứng dụng", null, (_, _) => Dispatcher.Invoke(ShowFromTray));
-        menu.Items.Add("Chụp vùng", null, (_, _) => Dispatcher.InvokeAsync(StartCaptureAsync));
-        menu.Items.Add("Chụp lại", null, (_, _) => Dispatcher.InvokeAsync(RepeatCaptureAsync));
-        var queryMenu = new Forms.ToolStripMenuItem("Chọn Query");
+        menu.Items.Add("Mở cửa sổ chính", null, (_, _) => Dispatcher.Invoke(ShowFromTray));
+        menu.Items.Add("Chọn vùng chụp", null, (_, _) => Dispatcher.InvokeAsync(StartCaptureAsync));
+        menu.Items.Add("Chụp lại vùng cũ", null, (_, _) => Dispatcher.InvokeAsync(RepeatCaptureAsync));
+        var queryMenu = new Forms.ToolStripMenuItem("Chọn phạm vi nhận diện");
         queryMenu.DropDownItems.Add("Tất cả Query", null, (_, _) => Dispatcher.Invoke(_viewModel.SelectRoot));
         for (var index = 1; index <= 14; index++)
         {
@@ -121,13 +125,13 @@ public partial class MainWindow : Window, IDisposable
             queryMenu.DropDownItems.Add($"Query_{index}", null, (_, _) => Dispatcher.Invoke(() => _viewModel.SelectQueryPosition(position)));
         }
         menu.Items.Add(queryMenu);
-        var lbpItem = new Forms.ToolStripMenuItem("Khớp trang phục (LBP)") { CheckOnClick = true };
+        var lbpItem = new Forms.ToolStripMenuItem("Hỗ trợ đối chiếu trang phục (LBP)") { CheckOnClick = true };
         lbpItem.CheckedChanged += (_, _) => Dispatcher.Invoke(() => _viewModel.AppearanceEnabled = lbpItem.Checked);
         menu.Items.Add(lbpItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
-        menu.Items.Add("Khởi động lại", null, (_, _) => Dispatcher.Invoke(Restart));
-        menu.Items.Add("Thoát", null, (_, _) => Dispatcher.Invoke(ExitApplication));
-        var drawingIcon = LoadApplicationIcon();
+        menu.Items.Add("Khởi động lại ứng dụng", null, (_, _) => Dispatcher.Invoke(Restart));
+        menu.Items.Add("Thoát ứng dụng", null, (_, _) => Dispatcher.Invoke(ExitApplication));
+        var drawingIcon = CreateStatusIcon(_controller.State);
         var notifyIcon = new Forms.NotifyIcon
         {
             Icon = drawingIcon,
@@ -154,11 +158,71 @@ public partial class MainWindow : Window, IDisposable
         return (System.Drawing.Icon)SystemIcons.Application.Clone();
     }
 
+    private static System.Drawing.Icon CreateStatusIcon(AppRuntimeState state)
+    {
+        using var baseIcon = LoadApplicationIcon();
+        using var bitmap = new Bitmap(32, 32, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using (var graphics = Graphics.FromImage(bitmap))
+        {
+            graphics.Clear(System.Drawing.Color.Transparent);
+            graphics.DrawIcon(baseIcon, new Rectangle(0, 0, 32, 32));
+            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            var color = state switch
+            {
+                AppRuntimeState.Monitoring => System.Drawing.Color.FromArgb(34, 197, 94),
+                AppRuntimeState.Error => System.Drawing.Color.FromArgb(239, 68, 68),
+                _ => System.Drawing.Color.FromArgb(245, 158, 11),
+            };
+            using var outline = new SolidBrush(System.Drawing.Color.FromArgb(245, 15, 23, 42));
+            using var fill = new SolidBrush(color);
+            graphics.FillEllipse(outline, 17, 17, 15, 15);
+            graphics.FillEllipse(fill, 19, 19, 11, 11);
+        }
+
+        var handle = bitmap.GetHicon();
+        try
+        {
+            using var icon = System.Drawing.Icon.FromHandle(handle);
+            return (System.Drawing.Icon)icon.Clone();
+        }
+        finally
+        {
+            DestroyIcon(handle);
+        }
+    }
+
+    private void OnTrayStateChanged(object? sender, AppStateChangedEventArgs e) =>
+        Dispatcher.InvokeAsync(() => UpdateTrayState(e.State, e.Error));
+
+    private void UpdateTrayState(AppRuntimeState state, string? error)
+    {
+        var replacement = CreateStatusIcon(state);
+        var previous = _trayDrawingIcon;
+        _trayDrawingIcon = replacement;
+        _trayIcon.Icon = replacement;
+        _trayIcon.Text = state switch
+        {
+            AppRuntimeState.Monitoring => "AutoMarker Re-ID · Đang theo dõi",
+            AppRuntimeState.Processing => "AutoMarker Re-ID · Đang nhận diện",
+            AppRuntimeState.Error => $"AutoMarker Re-ID · {Truncate(error ?? "Lỗi", 42)}",
+            _ => $"AutoMarker Re-ID · {state}",
+        };
+        previous.Dispose();
+    }
+
+    private static string Truncate(string value, int length) => value.Length <= length ? value : value[..length];
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DestroyIcon(nint handle);
+
     private void OnReviewRequested(object? sender, ReviewRequestedEventArgs args)
     {
         args.MarkHandled();
         Dispatcher.InvokeAsync(() =>
         {
+            var best = args.Session.Matches.OrderByDescending(match => match.Score).FirstOrDefault();
+            ShowOsd(best is null ? "Không có kết quả đạt ngưỡng" : $"{best.QueryId} · {best.Score:P0}");
             var review = new ReviewWindow(args.Session, _candidateGenerator, _selection, _codec, _boxRenderer) { Owner = IsVisible ? this : null };
             review.ShowDialog();
             args.Complete(review.Outcome ?? new ReviewOutcome(ReviewDecision.Cancel));
@@ -197,25 +261,28 @@ public partial class MainWindow : Window, IDisposable
     {
         var image = await _captureService.CaptureAsync(region, CancellationToken.None);
         _latestCapture = image;
-        if (_selection.SaveCaptures) await SaveScreenshotAsync(image);
-        _clipboardMonitor.IgnoreNextWrite();
-        await _clipboardWriter.WriteImageAsync(image, CancellationToken.None);
         if (image.Width > image.Height && !_interfaceDetector.IsReIdInterface(image, out _))
         {
             var editor = new ImageEditorWindow(image, _codec) { Owner = IsVisible ? this : null };
             if (editor.ShowDialog() == true && editor.Result is { } edited) image = edited;
             else return;
         }
-        _controller.TryQueue(ImageJob.Create(image, source));
+        // Persist and publish the final image. The editor is part of the
+        // capture flow, so saving before it opened silently wrote the original.
+        var sourcePath = _selection.SaveCaptures ? await SaveScreenshotAsync(image) : null;
+        _clipboardMonitor.IgnoreNextWrite();
+        await _clipboardWriter.WriteImageAsync(image, CancellationToken.None);
+        _controller.TryQueue(ImageJob.Create(image, source, sourcePath));
     }
 
-    private async Task SaveScreenshotAsync(ImageFrame image)
+    private async Task<string> SaveScreenshotAsync(ImageFrame image)
     {
         var pictures = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
         var directory = Path.Combine(pictures, "Screenshots");
         Directory.CreateDirectory(directory);
         var file = Path.Combine(directory, $"ReID_{DateTime.Now:yyyyMMdd_HHmmss_ffffff}.png");
         await File.WriteAllBytesAsync(file, _codec.EncodePng(image));
+        return file;
     }
 
     private void OpenLibrary()
@@ -238,7 +305,7 @@ public partial class MainWindow : Window, IDisposable
         }
         catch (Exception exception)
         {
-            DarkMessageBox.Show(this, exception.Message, "Sửa ảnh", MessageBoxButton.OK, MessageBoxImage.Error);
+            DarkMessageBox.Show(this, exception.Message, "Chỉnh sửa ảnh", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -264,8 +331,8 @@ public partial class MainWindow : Window, IDisposable
         var scope = _viewModel.SelectedQuery?.Id;
         var label = scope ?? "toàn bộ Query";
         var answer = DarkMessageBox.Show(this,
-            $"Xóa ảnh trong {label}, cache tương ứng và đưa toàn bộ output vào Recycle Bin?",
-            "Xóa Query", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+            $"Xóa ảnh trong {label}, dữ liệu AI tương ứng và chuyển toàn bộ kết quả đã lưu vào Thùng rác?",
+            "Xóa dữ liệu Query", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;
         try
         {
@@ -274,10 +341,11 @@ public partial class MainWindow : Window, IDisposable
                 await _resultRepository.MoveToRecycleBinAsync(result, CancellationToken.None);
             await _controller.RebuildCacheAsync(null, CancellationToken.None);
             _viewModel.RefreshQueries();
+            ShowOsd($"Đã chuyển {label} vào Thùng rác");
         }
         catch (Exception exception)
         {
-            DarkMessageBox.Show(this, exception.Message, "Xóa Query", MessageBoxButton.OK, MessageBoxImage.Error);
+            DarkMessageBox.Show(this, exception.Message, "Xóa dữ liệu Query", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -309,7 +377,7 @@ public partial class MainWindow : Window, IDisposable
 
         var active = _hotkeyRegistrations.Count(item => item.Registered);
         var failed = _hotkeyRegistrations.Count(item => !item.Registered);
-        _viewModel.HotkeyStatus = $"Phím tắt: {active} hoạt động{(failed > 0 ? $", {failed} bị chiếm" : string.Empty)}";
+        _viewModel.HotkeyStatus = $"Phím tắt: {active} khả dụng{(failed > 0 ? $", {failed} không khả dụng" : string.Empty)}";
     }
 
     private void RegisterInputHooks()
@@ -322,7 +390,7 @@ public partial class MainWindow : Window, IDisposable
         }
         catch (Win32Exception exception)
         {
-            _viewModel.HotkeyStatus += $" · mouse hook lỗi {exception.NativeErrorCode}";
+            _viewModel.HotkeyStatus += $" · Theo dõi chuột gặp lỗi {exception.NativeErrorCode}";
         }
     }
 
@@ -354,7 +422,7 @@ public partial class MainWindow : Window, IDisposable
     private void ShowHotkeyDetails()
     {
         var lines = _hotkeyRegistrations.Select(item =>
-            $"{item.Binding.Gesture}: {(item.Registered ? "Hoạt động" : $"Bị chiếm/lỗi {item.ErrorCode}")}");
+            $"{item.Binding.Gesture}: {(item.Registered ? "Sẵn sàng" : $"Không khả dụng (mã lỗi {item.ErrorCode})")}");
         DarkMessageBox.Show(this, string.Join(Environment.NewLine, lines), "Phím tắt toàn cục",
             MessageBoxButton.OK, MessageBoxImage.Information);
     }

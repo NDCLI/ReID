@@ -36,9 +36,13 @@ public partial class ImageEditorWindow : Window
 
     private void OnMouseDown(object sender, MouseButtonEventArgs e)
     {
+        // Receive the drag from the whole preview viewport, then clamp the
+        // coordinates back to the image just like the legacy canvas editor.
+        // This lets users start or finish the gesture outside the image.
         _dragStart = Clamp(e.GetPosition(ImageSurface));
-        ImageSurface.CaptureMouse();
+        Mouse.Capture(this, CaptureMode.SubTree);
         UpdateSelection(_dragStart.Value, _dragStart.Value);
+        e.Handled = true;
     }
 
     private void OnMouseMove(object sender, WpfMouseEventArgs e)
@@ -51,13 +55,16 @@ public partial class ImageEditorWindow : Window
     {
         if (_dragStart is not { } start) return;
         var end = Clamp(e.GetPosition(ImageSurface));
-        var removeVerticalStrip = Math.Abs(end.X - start.X) >= Math.Abs(end.Y - start.Y);
+        var removeVerticalStrip = Math.Abs(end.X - start.X) > Math.Abs(end.Y - start.Y);
         _dragStart = null;
-        ImageSurface.ReleaseMouseCapture();
+        Mouse.Capture(null);
         Selection.Visibility = Visibility.Collapsed;
         var box = new BoundingBox((int)Math.Min(start.X, end.X), (int)Math.Min(start.Y, end.Y),
             (int)Math.Max(start.X, end.X), (int)Math.Max(start.Y, end.Y));
-        if (box.Width < 5 || box.Height < 5) return;
+        // Cut-out follows the drag direction: a short movement in the other
+        // axis is enough to select a strip, matching the legacy editor.
+        if (CutMode.IsChecked != true && (box.Width < 5 || box.Height < 5)) return;
+        if (CutMode.IsChecked == true && box.Width < 5 && box.Height < 5) return;
         try
         {
             _undo.Push(_current);
@@ -69,8 +76,15 @@ public partial class ImageEditorWindow : Window
         catch (Exception exception)
         {
             if (_undo.Count > 0) _undo.Pop();
-            DarkMessageBox.Show(this, exception.Message, "Image Editor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            DarkMessageBox.Show(this, exception.Message, "Chỉnh sửa ảnh", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    private void OnLostMouseCapture(object sender, WpfMouseEventArgs e)
+    {
+        if (_dragStart is null) return;
+        _dragStart = null;
+        Selection.Visibility = Visibility.Collapsed;
     }
 
     private void OnUndo(object sender, RoutedEventArgs e)
@@ -101,7 +115,7 @@ public partial class ImageEditorWindow : Window
         }
         catch (Exception exception)
         {
-            DarkMessageBox.Show(this, exception.Message, "Image Editor", MessageBoxButton.OK, MessageBoxImage.Error);
+            DarkMessageBox.Show(this, exception.Message, "Chỉnh sửa ảnh", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -114,7 +128,7 @@ public partial class ImageEditorWindow : Window
         else if ((e.Key == Key.S && Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) || e.Key == Key.Enter) { OnSave(sender, e); e.Handled = true; }
         else if (e.Key == Key.Escape)
         {
-            if (_dragStart is not null) { _dragStart = null; Selection.Visibility = Visibility.Collapsed; ImageSurface.ReleaseMouseCapture(); }
+            if (_dragStart is not null) { _dragStart = null; Selection.Visibility = Visibility.Collapsed; Mouse.Capture(null); }
             else OnCancel(sender, e);
             e.Handled = true;
         }
@@ -125,7 +139,7 @@ public partial class ImageEditorWindow : Window
         PreviewImage.Source = WpfImageConversion.ToBitmapSource(_current);
         ImageSurface.Width = Overlay.Width = _current.Width;
         ImageSurface.Height = Overlay.Height = _current.Height;
-        InfoText.Text = $"{_current.Width} × {_current.Height} px · Kéo để {(CropMode.IsChecked == true ? "crop" : "xóa dải")} · Ctrl+Z hoàn tác";
+        InfoText.Text = $"{_current.Width} × {_current.Height} px · Kéo chuột để {(CropMode.IsChecked == true ? "chọn vùng cần giữ" : "chọn dải cần xóa")} · Ctrl+Z để hoàn tác";
     }
 
     private WpfPoint Clamp(WpfPoint point) => new(Math.Clamp(point.X, 0, _current.Width), Math.Clamp(point.Y, 0, _current.Height));
@@ -142,7 +156,7 @@ public partial class ImageEditorWindow : Window
         // vertical drag removes a horizontal strip.
         if (CutMode.IsChecked == true && (width > 0 || height > 0))
         {
-            if (width >= height)
+            if (width > height)
             {
                 top = 0;
                 height = _current.Height;

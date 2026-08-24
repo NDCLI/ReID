@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\AutoMarkerReID.App\AutoMarkerReID.App.csproj" />
     <ProjectReference Include="..\..\src\AutoMarkerReID.Application\AutoMarkerReID.Application.csproj" />
     <ProjectReference Include="..\..\src\AutoMarkerReID.Domain\AutoMarkerReID.Domain.csproj" />
     <ProjectReference Include="..\..\src\AutoMarkerReID.Imaging\AutoMarkerReID.Imaging.csproj" />

@@ -56,6 +56,29 @@ public sealed class QueryTests
         }
     }
 
+    [Fact]
+    public async Task DeleteQuerySendsReferenceFilesToTrashService()
+    {
+        var root = CreateRoot();
+        try
+        {
+            var paths = new StoragePaths(root, Path.Combine(root, "models"));
+            paths.EnsureCreated();
+            var reference = Path.Combine(paths.Queries, "Query_4", "sample.png");
+            await File.WriteAllBytesAsync(reference, [1, 2, 3]);
+            var trash = new RecordingTrashService();
+            var repository = new FileQueryRepository(paths, new OpenCvImageCodec(), new FileFeatureCache(paths), trash);
+
+            await repository.DeleteScopeAsync("Query_4", CancellationToken.None);
+
+            Assert.Contains(reference, trash.Paths, StringComparer.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
     private static string CreateRoot()
     {
         var path = Path.Combine(Path.GetTempPath(), $"automarker-queries-{Guid.NewGuid():N}");
@@ -77,6 +100,18 @@ public sealed class QueryTests
     private sealed class FakeOcr : IOcrService
     {
         public Task<string?> ReadTimestampAsync(ImageFrame card, CancellationToken cancellationToken) => Task.FromResult<string?>("7:42 AM");
+    }
+
+    private sealed class RecordingTrashService : IFileTrashService
+    {
+        public List<string> Paths { get; } = [];
+
+        public Task MoveToRecycleBinAsync(IReadOnlyCollection<string> paths, CancellationToken cancellationToken)
+        {
+            Paths.AddRange(paths);
+            foreach (var path in paths) File.Delete(path);
+            return Task.CompletedTask;
+        }
     }
 }
 

@@ -13,6 +13,7 @@ public sealed class ApplicationController : BackgroundService
     private readonly IReviewCompletionService _reviewCompletion;
     private readonly IMatchEngine _matchEngine;
     private readonly UserSelectionState _selection;
+    private readonly ClipboardActivityStats _clipboardActivity;
     private readonly ILogger<ApplicationController> _logger;
     private readonly Channel<ImageJob> _jobs;
     private readonly Lock _stateLock = new();
@@ -25,6 +26,7 @@ public sealed class ApplicationController : BackgroundService
         IReviewCompletionService reviewCompletion,
         IMatchEngine matchEngine,
         UserSelectionState selection,
+        ClipboardActivityStats clipboardActivity,
         ILogger<ApplicationController> logger)
     {
         _initializer = initializer;
@@ -33,6 +35,7 @@ public sealed class ApplicationController : BackgroundService
         _reviewCompletion = reviewCompletion;
         _matchEngine = matchEngine;
         _selection = selection;
+        _clipboardActivity = clipboardActivity;
         _logger = logger;
         _jobs = Channel.CreateBounded<ImageJob>(new BoundedChannelOptions(1)
         {
@@ -130,7 +133,12 @@ public sealed class ApplicationController : BackgroundService
         cancellationToken.ThrowIfCancellationRequested();
         if (!TryQueue(job))
         {
+            _clipboardActivity.RecordSkipped();
             ApplicationControllerLog.ClipboardSkipped(_logger, State);
+        }
+        else
+        {
+            _clipboardActivity.RecordReceived();
         }
 
         return ValueTask.CompletedTask;
@@ -149,7 +157,7 @@ public sealed class ApplicationController : BackgroundService
             try
             {
                 var result = await _processor.ProcessAsync(job, cancellationToken).ConfigureAwait(false);
-                await HandleResultAsync(result, cancellationToken).ConfigureAwait(false);
+                await HandleResultAsync(job, result, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -171,7 +179,7 @@ public sealed class ApplicationController : BackgroundService
         }
     }
 
-    private async Task HandleResultAsync(ProcessingResult result, CancellationToken cancellationToken)
+    private async Task HandleResultAsync(ImageJob job, ProcessingResult result, CancellationToken cancellationToken)
     {
         switch (result)
         {
@@ -179,7 +187,8 @@ public sealed class ApplicationController : BackgroundService
                 ApplicationControllerLog.ImageIgnored(_logger, ignored.Reason);
                 break;
             case ProcessingResult.QueryCollected collected:
-                ApplicationControllerLog.ReferenceAdded(_logger, collected.QueryId, collected.ImagePath);
+                ApplicationControllerLog.ReferenceAdded(_logger, collected.QueryId);
+                DirectCaptureCleanupPolicy.TryDeleteSavedCopy(job, result, _logger);
                 break;
             case ProcessingResult.ReviewRequired review:
                 var activeSession = review.Session;
@@ -199,7 +208,12 @@ public sealed class ApplicationController : BackgroundService
                     {
                         SetState(AppRuntimeState.Processing);
                         var matches = await _matchEngine.MatchAsync(outcome.EditedImage, _selection.RecognitionScope, cancellationToken).ConfigureAwait(false);
-                        activeSession = activeSession with { Original = outcome.EditedImage, Matches = matches };
+                        activeSession = activeSession with
+                        {
+                            Original = outcome.EditedImage,
+                            Matches = matches,
+                            Explanations = _matchEngine.LastExplanations,
+                        };
                         continue;
                     }
 
@@ -241,10 +255,10 @@ public sealed class ApplicationController : BackgroundService
 
 internal static partial class ApplicationControllerLog
 {
-    [LoggerMessage(EventId = 1000, Level = LogLevel.Critical, Message = "Engine không thể khởi tạo hoặc vòng xử lý đã dừng.")]
+    [LoggerMessage(EventId = 1000, Level = LogLevel.Critical, Message = "Hệ thống nhận diện không thể khởi động hoặc tiến trình xử lý đã dừng.")]
     public static partial void EngineStopped(ILogger logger, Exception exception);
 
-    [LoggerMessage(EventId = 1001, Level = LogLevel.Debug, Message = "Bỏ generation clipboard vì state hiện tại là {state}.")]
+    [LoggerMessage(EventId = 1001, Level = LogLevel.Debug, Message = "Bỏ qua thay đổi Clipboard vì ứng dụng đang ở trạng thái {state}.")]
     public static partial void ClipboardSkipped(ILogger logger, AppRuntimeState state);
 
     [LoggerMessage(EventId = 1002, Level = LogLevel.Error, Message = "Xử lý ảnh {jobId} thất bại.")]
@@ -253,10 +267,10 @@ internal static partial class ApplicationControllerLog
     [LoggerMessage(EventId = 1003, Level = LogLevel.Information, Message = "Ảnh bị bỏ qua: {reason}")]
     public static partial void ImageIgnored(ILogger logger, string reason);
 
-    [LoggerMessage(EventId = 1004, Level = LogLevel.Information, Message = "Đã thêm reference vào {queryId}: {imagePath}")]
-    public static partial void ReferenceAdded(ILogger logger, string queryId, string imagePath);
+    [LoggerMessage(EventId = 1004, Level = LogLevel.Information, Message = "Đã thêm ảnh tham chiếu vào {queryId}.")]
+    public static partial void ReferenceAdded(ILogger logger, string queryId);
 
-    [LoggerMessage(EventId = 1005, Level = LogLevel.Warning, Message = "Không có UI xử lý Review; phiên review được hủy an toàn.")]
+    [LoggerMessage(EventId = 1005, Level = LogLevel.Warning, Message = "Không có giao diện kiểm tra kết quả; phiên hiện tại đã được hủy an toàn.")]
     public static partial void ReviewHandlerMissing(ILogger logger);
 }
 

@@ -20,12 +20,14 @@ public sealed class ImageProcessingPipeline(
                 job.Image,
                 matches,
                 DateTimeOffset.Now,
-                job.Source));
+                job.Source,
+                matchEngine.LastExplanations));
         }
 
-        var collected = await queryCollector.TryCollectAsync(job.Image, selection.TargetQuery, cancellationToken).ConfigureAwait(false);
+        var targetQuery = selection.TargetQuery;
+        var collected = await queryCollector.TryCollectAsync(job.Image, targetQuery, cancellationToken).ConfigureAwait(false);
         return collected.Accepted
-            ? new ProcessingResult.QueryCollected(selection.TargetQuery, collected.ImagePath!)
+            ? new ProcessingResult.QueryCollected(targetQuery, collected.ImagePath!)
             : new ProcessingResult.Ignored(collected.Reason);
     }
 }

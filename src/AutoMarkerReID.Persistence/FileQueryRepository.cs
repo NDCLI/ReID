@@ -4,7 +4,11 @@ using AutoMarkerReID.Domain;
 
 namespace AutoMarkerReID.Persistence;
 
-public sealed partial class FileQueryRepository(StoragePaths paths, IImageCodec codec, IFeatureCache cache) : IQueryRepository
+public sealed partial class FileQueryRepository(
+    StoragePaths paths,
+    IImageCodec codec,
+    IFeatureCache cache,
+    IFileTrashService? trashService = null) : IQueryRepository
 {
     public string RootPath => paths.Queries;
 
@@ -88,26 +92,27 @@ public sealed partial class FileQueryRepository(StoragePaths paths, IImageCodec 
         }
     }
 
-    public Task DeleteScopeAsync(string? queryId, CancellationToken cancellationToken)
+    public async Task DeleteScopeAsync(string? queryId, CancellationToken cancellationToken)
     {
         var directories = queryId is null
             ? Directory.EnumerateDirectories(paths.Queries, "Query_*")
             : [Path.Combine(paths.Queries, queryId)];
         foreach (var directory in directories.Where(Directory.Exists))
         {
-            foreach (var file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
+            var files = Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories).ToArray();
+            if (files.Length > 0 && trashService is not null)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                File.Delete(file);
+                await trashService.MoveToRecycleBinAsync(files, cancellationToken).ConfigureAwait(false);
             }
-
-            foreach (var child in Directory.EnumerateDirectories(directory, "*", SearchOption.AllDirectories).OrderByDescending(path => path.Length))
+            else
             {
-                Directory.Delete(child, recursive: false);
+                foreach (var file in files)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    File.Delete(file);
+                }
             }
         }
-
-        return Task.CompletedTask;
     }
 
     private static float Calibrate(List<ReferenceImage> references)

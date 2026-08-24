@@ -135,6 +135,6 @@ public sealed class EngineInitializer(
 
 internal static partial class EngineInitializerLog
 {
-    [LoggerMessage(EventId = 3100, Level = LogLevel.Error, Message = "Không thể tạo cache cho reference {path}.")]
+    [LoggerMessage(EventId = 3100, Level = LogLevel.Error, Message = "Không thể tạo dữ liệu AI cho ảnh tham chiếu {path}.")]
     public static partial void ReferenceBuildFailed(ILogger logger, string path, Exception exception);
 }

@@ -13,18 +13,18 @@ public static class CropValidator
     {
         if (image.Height < 100)
         {
-            return new(false, "crop thấp hơn 100 px");
+            return new(false, "ảnh người thấp hơn kích thước tối thiểu 100 px");
         }
 
         if (image.Width < 35)
         {
-            return new(false, "crop hẹp hơn 35 px");
+            return new(false, "ảnh người hẹp hơn kích thước tối thiểu 35 px");
         }
 
         var ratio = (double)image.Height / image.Width;
         if (ratio is < 1.2 or > 5.5)
         {
-            return new(false, "tỷ lệ người không hợp lệ");
+            return new(false, "tỷ lệ khung hình không phù hợp với ảnh người");
         }
 
         using var mat = MatConversion.ToMat(image);
@@ -32,7 +32,7 @@ public static class CropValidator
         var maxDeviation = Enumerable.Range(0, mat.Channels()).Max(channel => deviation[channel]);
         if (maxDeviation < 12)
         {
-            return new(false, "ảnh quá phẳng");
+            return new(false, "ảnh có quá ít chi tiết để sử dụng");
         }
 
         return new(true, "hợp lệ");

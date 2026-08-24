@@ -85,7 +85,7 @@ static async Task ProcessAsync(
             Console.WriteLine($"Bỏ qua: {ignored.Reason}");
             break;
         case ProcessingResult.QueryCollected collected:
-            Console.WriteLine($"Đã thêm {collected.QueryId}: {collected.ImagePath}");
+            Console.WriteLine($"Đã thêm ảnh tham chiếu vào {collected.QueryId}: {collected.ImagePath}");
             break;
         case ProcessingResult.ReviewRequired review:
             var saved = await repository.SaveAsync(review.Session, cancellationToken);
@@ -106,6 +106,7 @@ static void ConfigureServices(IServiceCollection services, StoragePaths paths)
     services.AddSingleton(paths);
     services.AddSingleton(new ModelLocations(paths.Models));
     services.AddSingleton<UserSelectionState>();
+    services.AddSingleton<ClipboardActivityStats>();
     services.AddSingleton<QueryCatalog>();
     services.AddSingleton<IImageCodec, OpenCvImageCodec>();
     services.AddSingleton<ICandidateGenerator, OpenCvCandidateGenerator>();
@@ -176,17 +177,17 @@ internal sealed record CliOptions(
     }
 
     public static void PrintHelp() => Console.WriteLine("""
-        AutoMarker Re-ID CLI (.NET 10, không Python)
+        AutoMarker Re-ID CLI (.NET 10, hoạt động hoàn toàn cục bộ)
 
-        --single <file>       Xử lý một ảnh rồi thoát
-        --query Query_N       Giới hạn matching và Query thu thập
-        --queries-dir <dir>   Đổi thư mục queries
-        --output-dir <dir>    Đổi thư mục output
-        --models-dir <dir>    Đổi thư mục model OpenVINO
-        --threshold <0..1>    Ghi đè ngưỡng body Re-ID
-        --debug-window        Hiện ảnh kết quả; nhấn phím để đóng
-        --verbose             Log chi tiết
-        --help                Hiện trợ giúp
+        --single <file>       Xử lý một ảnh rồi kết thúc
+        --query Query_N       Chỉ nhận diện và lưu ảnh tham chiếu trong Query đã chọn
+        --queries-dir <dir>   Chỉ định thư mục chứa dữ liệu Query
+        --output-dir <dir>    Chỉ định thư mục lưu kết quả
+        --models-dir <dir>    Chỉ định thư mục mô hình OpenVINO
+        --threshold <0..1>    Đặt ngưỡng nhận diện người
+        --debug-window        Hiển thị ảnh kết quả; nhấn phím bất kỳ để đóng
+        --verbose             Hiển thị nhật ký chi tiết
+        --help                Hiển thị hướng dẫn sử dụng
 
         Không có --single: theo dõi Clipboard đến khi nhấn Ctrl+C.
         """);

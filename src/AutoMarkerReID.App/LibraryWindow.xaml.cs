@@ -44,7 +44,7 @@ public partial class LibraryWindow : Window
         _results = await _repository.ListAsync(CancellationToken.None);
         ResultList.ItemsSource = _results;
         ResultList.SelectedIndex = _results.Count > 0 ? 0 : -1;
-        if (_results.Count == 0) ClearPreview("Chưa có kết quả trong output/.");
+        if (_results.Count == 0) ClearPreview("Chưa có kết quả nhận diện nào được lưu.");
     }
 
     private async void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -114,8 +114,8 @@ public partial class LibraryWindow : Window
         ImageSurface.Height = BoxCanvas.Height = preview.Height;
         BoxCanvas.Children.Clear();
         InfoText.Text = editable
-            ? $"{_matches.Count} khung · Click card để thêm/xóa · thay đổi tự lưu khi chuyển ảnh"
-            : "Ảnh legacy: chỉ xem/copy, không có original + JSON để sửa khung.";
+            ? $"{_matches.Count} khung · Nhấp vào thẻ để thêm hoặc xóa khung · Thay đổi được tự động lưu khi chuyển ảnh"
+            : "Kết quả cũ chỉ hỗ trợ xem và sao chép vì không có ảnh gốc cùng dữ liệu chỉnh sửa.";
     }
 
     private void OnImageClick(object sender, MouseButtonEventArgs e)

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string]$Version = '1.0.0',
+    [string]$Version = '1.0.2',
     [string]$CertificateThumbprint,
     [string]$PfxPath,
     [string]$TimestampUrl = 'http://timestamp.digicert.com'
@@ -10,7 +10,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $repoRoot 'src\AutoMarkerReID.App\AutoMarkerReID.App.csproj'
-$publishDir = Join-Path $repoRoot 'artifacts\publish\setup-win-x64'
+$publishDir = Join-Path ([IO.Path]::GetTempPath()) ("AutoMarkerReID-setup-" + [Guid]::NewGuid().ToString('N'))
 $setupDir = Join-Path $repoRoot 'artifacts\setup'
 $iconPath = Join-Path $repoRoot 'src\AutoMarkerReID.App\Assets\app.ico'
 $issPath = Join-Path $PSScriptRoot 'AutoMarkerReID.iss'
@@ -87,41 +87,48 @@ function Find-InnoCompiler {
 
 New-Item -ItemType Directory -Path $publishDir, $setupDir -Force | Out-Null
 
-dotnet publish $projectPath `
-    -c Release `
-    -r win-x64 `
-    --self-contained true `
-    --no-restore `
-    -p:DebugType=None `
-    -p:DebugSymbols=false `
-    -p:SatelliteResourceLanguages=en `
-    -p:Version=$Version `
-    -p:FileVersion="$Version.0" `
-    -p:AssemblyVersion="$Version.0" `
-    -o $publishDir
-if ($LASTEXITCODE -ne 0) {
-    throw 'dotnet publish failed.'
+try {
+    dotnet publish $projectPath `
+        -c Release `
+        -r win-x64 `
+        --self-contained true `
+        --no-restore `
+        -p:DebugType=None `
+        -p:DebugSymbols=false `
+        -p:SatelliteResourceLanguages=en `
+        -p:Version=$Version `
+        -p:FileVersion="$Version.0" `
+        -p:AssemblyVersion="$Version.0" `
+        -o $publishDir
+    if ($LASTEXITCODE -ne 0) {
+        throw 'dotnet publish failed.'
+    }
+
+    $ownBinaries = Get-ChildItem -LiteralPath $publishDir -File |
+        Where-Object { $_.Name -eq 'AutoMarkerReID.App.exe' -or $_.Name -like 'AutoMarkerReID.*.dll' } |
+        Select-Object -ExpandProperty FullName
+    Invoke-CodeSign $ownBinaries
+
+    $iscc = Find-InnoCompiler
+    & $iscc "/DAppVersion=$Version" "/DPublishDir=$publishDir" "/DOutputDir=$setupDir" "/DSetupIcon=$iconPath" $issPath
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Installer compilation failed.'
+    }
+
+    $setupPath = Join-Path $setupDir "AutoMarkerReID-Setup-$Version-win-x64.exe"
+    Invoke-CodeSign @($setupPath)
+
+    $hash = Get-FileHash -LiteralPath $setupPath -Algorithm SHA256
+    $sizeMb = [Math]::Round((Get-Item -LiteralPath $setupPath).Length / 1MB, 2)
+    Write-Host "Installer: $setupPath"
+    Write-Host "Size: $sizeMb MB"
+    Write-Host "SHA256: $($hash.Hash)"
+    if (-not $CertificateThumbprint -and -not $PfxPath) {
+        Write-Warning 'The installer is not Authenticode-signed. Use CertificateThumbprint or PfxPath for a public release.'
+    }
 }
-
-$ownBinaries = Get-ChildItem -LiteralPath $publishDir -File |
-    Where-Object { $_.Name -eq 'AutoMarkerReID.App.exe' -or $_.Name -like 'AutoMarkerReID.*.dll' } |
-    Select-Object -ExpandProperty FullName
-Invoke-CodeSign $ownBinaries
-
-$iscc = Find-InnoCompiler
-& $iscc "/DAppVersion=$Version" "/DPublishDir=$publishDir" "/DOutputDir=$setupDir" "/DSetupIcon=$iconPath" $issPath
-if ($LASTEXITCODE -ne 0) {
-    throw 'Installer compilation failed.'
-}
-
-$setupPath = Join-Path $setupDir "AutoMarkerReID-Setup-$Version-win-x64.exe"
-Invoke-CodeSign @($setupPath)
-
-$hash = Get-FileHash -LiteralPath $setupPath -Algorithm SHA256
-$sizeMb = [Math]::Round((Get-Item -LiteralPath $setupPath).Length / 1MB, 2)
-Write-Host "Installer: $setupPath"
-Write-Host "Size: $sizeMb MB"
-Write-Host "SHA256: $($hash.Hash)"
-if (-not $CertificateThumbprint -and -not $PfxPath) {
-    Write-Warning 'The installer is not Authenticode-signed. Use CertificateThumbprint or PfxPath for a public release.'
+finally {
+    if (Test-Path -LiteralPath $publishDir) {
+        Remove-Item -LiteralPath $publishDir -Recurse -Force
+    }
 }

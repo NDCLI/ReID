@@ -8,7 +8,7 @@
         <Grid.ColumnDefinitions><ColumnDefinition Width="285"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
         <Border Background="{StaticResource PanelBrush}" CornerRadius="8" Padding="8" Margin="0,0,12,0">
             <DockPanel>
-                <TextBlock DockPanel.Dock="Top" Text="ẢNH ĐÃ CHỤP" Foreground="{StaticResource AccentBrush}"
+                <TextBlock DockPanel.Dock="Top" Text="ẢNH CHỤP GẦN ĐÂY" Foreground="{StaticResource AccentBrush}"
                            FontWeight="SemiBold" Margin="6"/>
                 <ListBox x:Name="CaptureList" SelectionChanged="OnSelectionChanged"
                          MouseDoubleClick="OnEdit" Background="Transparent" BorderThickness="0">
@@ -35,8 +35,8 @@
             <WrapPanel Grid.Row="2" HorizontalAlignment="Right">
                 <Button Content="← Trước" Click="OnPrevious"/>
                 <Button Content="Tiếp →" Click="OnNext"/>
-                <Button Content="Chỉnh sửa" Background="#0284C7" Click="OnEdit"/>
-                <Button Content="Làm mới" Click="OnRefresh"/>
+                <Button Content="Chỉnh sửa ảnh" Background="#0284C7" Click="OnEdit"/>
+                <Button Content="Tải lại danh sách" Click="OnRefresh"/>
                 <Button Content="Đóng" Click="OnClose"/>
             </WrapPanel>
         </Grid>

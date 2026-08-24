@@ -6,7 +6,7 @@ public sealed class UserSelectionState
     private string? _recognitionScope;
     private string _targetQuery = "Query_1";
     private bool _appearanceEnabled;
-    private bool _saveCaptures;
+    private bool _saveCaptures = true;
     private float? _matchThresholdOverride;
 
     public string? RecognitionScope

@@ -33,7 +33,7 @@ public partial class CaptureLibraryWindow : Window
         var items = new List<CaptureListItem>();
         if (_latestCapture is not null)
         {
-            items.Add(new CaptureListItem("Ảnh mới nhất trong phiên", "Chưa phụ thuộc file đã lưu", null, _latestCapture));
+            items.Add(new CaptureListItem("Ảnh vừa chụp", "Có thể xem ngay cả khi chưa lưu thành tệp", null, _latestCapture));
         }
 
         if (Directory.Exists(_captureDirectory))
@@ -61,7 +61,7 @@ public partial class CaptureLibraryWindow : Window
         {
             _currentImage = null;
             PreviewImage.Source = null;
-            InfoText.Text = $"Chưa có ảnh trong {_captureDirectory}. Hãy bật “Lưu ảnh chụp” để tạo danh sách.";
+            InfoText.Text = $"Chưa có ảnh nào trong {_captureDirectory}. Hãy bật tính năng tự động lưu ảnh chụp để tạo danh sách.";
         }
         await Task.CompletedTask;
     }
@@ -75,7 +75,7 @@ public partial class CaptureLibraryWindow : Window
             PreviewImage.Source = WpfImageConversion.ToBitmapSource(_currentImage);
             PreviewImage.Width = _currentImage.Width;
             PreviewImage.Height = _currentImage.Height;
-            InfoText.Text = $"{item.DisplayName} · {_currentImage.Width} × {_currentImage.Height} px · Double-click để chỉnh sửa";
+            InfoText.Text = $"{item.DisplayName} · {_currentImage.Width} × {_currentImage.Height} px · Nhấp đúp để chỉnh sửa";
         }
         catch (Exception exception)
         {

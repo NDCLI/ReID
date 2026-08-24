@@ -15,6 +15,10 @@ public sealed class OpenVinoMatchEngine(
     UserSelectionState selection,
     ILogger<OpenVinoMatchEngine> logger) : IMatchEngine
 {
+    private IReadOnlyList<RecognitionExplanation> _lastExplanations = [];
+
+    public IReadOnlyList<RecognitionExplanation> LastExplanations => Volatile.Read(ref _lastExplanations);
+
     private static readonly IReadOnlyDictionary<string, float> ModelWeights = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase)
     {
         ["osnet_0288"] = 0.25f,
@@ -24,6 +28,8 @@ public sealed class OpenVinoMatchEngine(
 
     public async Task<IReadOnlyList<MatchResult>> MatchAsync(ImageFrame screenshot, string? queryScope, CancellationToken cancellationToken)
     {
+        var explanations = new List<RecognitionExplanation>();
+        Volatile.Write(ref _lastExplanations, []);
         var queries = catalog.Snapshot;
         var scopedQueries = queryScope is null
             ? queries
@@ -54,6 +60,8 @@ public sealed class OpenVinoMatchEngine(
                 var embeddings = await runtime.ExtractBodyEmbeddingsAsync(crop, cancellationToken).ConfigureAwait(false);
                 if (embeddings.Count == 0)
                 {
+                    explanations.Add(new RecognitionExplanation(candidate.BoundingBox, null, 0, 0, null, null,
+                        false, "Không trích xuất được đặc trưng từ card.", new Dictionary<string, float>()));
                     continue;
                 }
 
@@ -65,6 +73,9 @@ public sealed class OpenVinoMatchEngine(
                     .ToList();
                 if (evaluations.Count == 0)
                 {
+                    explanations.Add(new RecognitionExplanation(candidate.BoundingBox, null, 0, 0, null, null,
+                        false, timestamp is null ? "Không có reference phù hợp." : "Không có reference cùng timestamp.",
+                        new Dictionary<string, float>()));
                     continue;
                 }
 
@@ -122,15 +133,27 @@ public sealed class OpenVinoMatchEngine(
                     appearanceMargin);
                 var threshold = selection.MatchThresholdOverride ?? winner.Query.CalibratedThreshold;
                 var decision = IdentityDecisionPolicy.Decide(score, threshold, selection.AppearanceEnabled);
+                var acceptedByGates = decision.Accepted && decision.Source is not null;
+                var reason = ExplainDecision(decision, score, threshold);
                 if (!decision.Accepted || decision.Source is null)
                 {
+                    explanations.Add(new RecognitionExplanation(candidate.BoundingBox, winner.Query.Id,
+                        winner.EnsembleScore, threshold, bodyMargin, winner.BestReferenceScore,
+                        false, reason, winner.ModelScores));
                     continue;
                 }
 
                 if (timestamp is not null && !string.Equals(timestamp, winner.BestReference?.Timestamp, StringComparison.OrdinalIgnoreCase))
                 {
+                    explanations.Add(new RecognitionExplanation(candidate.BoundingBox, winner.Query.Id,
+                        winner.EnsembleScore, threshold, bodyMargin, winner.BestReferenceScore,
+                        false, $"Bị loại: timestamp {timestamp} không khớp reference.", winner.ModelScores));
                     continue;
                 }
+
+                explanations.Add(new RecognitionExplanation(candidate.BoundingBox, winner.Query.Id,
+                    winner.EnsembleScore, threshold, bodyMargin, winner.BestReferenceScore,
+                    acceptedByGates, reason, winner.ModelScores));
 
                 accepted.Add(new MatchResult(
                     winner.Query.Id,
@@ -151,7 +174,33 @@ public sealed class OpenVinoMatchEngine(
         }
 
         var postProcessed = MatchPostProcessor.Apply(accepted, scopedQueries, source?.BoundingBox);
+        var retainedBoxes = postProcessed.Select(match => match.BoundingBox).ToHashSet();
+        var finalExplanations = explanations.Select(item =>
+            item.Accepted && !retainedBoxes.Contains(boxRenderer.SnapToCard(screenshot, item.BoundingBox))
+                ? item with { Accepted = false, Reason = "Đạt ngưỡng nhưng bị hậu xử lý loại (Query trội, giới hạn số lượng hoặc vị trí trùng)." }
+                : item).ToArray();
+        Volatile.Write(ref _lastExplanations, finalExplanations);
         return postProcessed;
+    }
+
+    private static string ExplainDecision(IdentityDecision decision, IdentityScore score, float threshold)
+    {
+        if (decision.Accepted)
+        {
+            return decision.Source switch
+            {
+                MatchSource.Face => "Đạt nhờ đối chiếu khuôn mặt.",
+                MatchSource.BodyWithAppearance => "Đạt nhờ LBP phân xử kết quả sát ngưỡng.",
+                _ => "Đạt score, margin và đồng thuận model.",
+            };
+        }
+
+        var reasons = new List<string>();
+        if (score.EnsembleScore < threshold) reasons.Add($"score {score.EnsembleScore:P0} < ngưỡng {threshold:P0}");
+        if (score.EnsembleScore - score.RunnerUpScore < ReIdDefaults.AiMatchMargin) reasons.Add("margin với Query kế tiếp quá thấp");
+        if (score.BestReferenceScore < ReIdDefaults.BestReferenceThreshold) reasons.Add("reference tốt nhất chưa đủ mạnh");
+        if (score.ModelWinners.Values.Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1) reasons.Add("các model không đồng thuận");
+        return reasons.Count == 0 ? "Không vượt qua các điều kiện open-set." : "Bị loại: " + string.Join(", ", reasons) + ".";
     }
 
     private static QueryEvaluation? EvaluateQuery(QueryIdentity query, IReadOnlyDictionary<string, float[]> candidate, string? timestamp)
@@ -233,9 +282,9 @@ public sealed class OpenVinoMatchEngine(
 
 internal static partial class MatchEngineLog
 {
-    [LoggerMessage(EventId = 3200, Level = LogLevel.Debug, Message = "Không tìm thấy candidate card.")]
+    [LoggerMessage(EventId = 3200, Level = LogLevel.Debug, Message = "Không tìm thấy thẻ kết quả phù hợp để phân tích.")]
     public static partial void NoCandidates(ILogger logger);
 
-    [LoggerMessage(EventId = 3201, Level = LogLevel.Error, Message = "Candidate tại ({x},{y}) inference thất bại.")]
+    [LoggerMessage(EventId = 3201, Level = LogLevel.Error, Message = "Không thể nhận diện thẻ kết quả tại vị trí ({x},{y}).")]
     public static partial void CandidateFailed(ILogger logger, int x, int y, Exception exception);
 }

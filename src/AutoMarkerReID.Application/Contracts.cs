@@ -81,6 +81,7 @@ public interface IModelRuntime : IAsyncDisposable
 
 public interface IOcrService
 {
+    bool IsReady => true;
     Task WarmupAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     Task<string?> ReadTimestampAsync(ImageFrame card, CancellationToken cancellationToken);
 }
@@ -109,6 +110,7 @@ public interface IQueryCollector
 
 public interface IMatchEngine
 {
+    IReadOnlyList<RecognitionExplanation> LastExplanations => [];
     Task<IReadOnlyList<MatchResult>> MatchAsync(ImageFrame screenshot, string? queryScope, CancellationToken cancellationToken);
 }
 

@@ -40,6 +40,17 @@ public sealed record MatchResult(
     MatchSource Source,
     bool ManuallyEdited = false);
 
+public sealed record RecognitionExplanation(
+    BoundingBox BoundingBox,
+    string? QueryId,
+    float Score,
+    float Threshold,
+    float? Margin,
+    float? BestReferenceScore,
+    bool Accepted,
+    string Reason,
+    IReadOnlyDictionary<string, float> ModelScores);
+
 public sealed record SavedResult(
     string Id,
     DateTimeOffset CreatedAt,
@@ -53,7 +64,8 @@ public sealed record ReviewSession(
     ImageFrame Original,
     IReadOnlyList<MatchResult> Matches,
     DateTimeOffset CreatedAt,
-    ImageJobSource Source);
+    ImageJobSource Source,
+    IReadOnlyList<RecognitionExplanation>? Explanations = null);
 
 public enum ReviewDecision
 {

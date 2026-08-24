@@ -26,7 +26,7 @@ public sealed class OpenVinoModelRuntime(ModelLocations locations, ILogger<OpenV
         {
             if (!File.Exists(definition.Path))
             {
-                OpenVinoRuntimeLog.ModelMissing(logger, definition.Name, definition.Path);
+                OpenVinoRuntimeLog.ModelMissing(logger, definition.Name);
                 continue;
             }
 
@@ -154,7 +154,7 @@ public sealed class OpenVinoModelRuntime(ModelLocations locations, ILogger<OpenV
     {
         if (!File.Exists(path))
         {
-            OpenVinoRuntimeLog.ModelMissing(logger, name, path);
+            OpenVinoRuntimeLog.ModelMissing(logger, name);
             return null;
         }
 
@@ -258,15 +258,15 @@ public sealed class OpenVinoModelRuntime(ModelLocations locations, ILogger<OpenV
 
 internal static partial class OpenVinoRuntimeLog
 {
-    [LoggerMessage(EventId = 3000, Level = Microsoft.Extensions.Logging.LogLevel.Warning, Message = "Model {name} không tồn tại tại {path}.")]
-    public static partial void ModelMissing(ILogger logger, string name, string path);
+    [LoggerMessage(EventId = 3000, Level = Microsoft.Extensions.Logging.LogLevel.Warning, Message = "Không tìm thấy mô hình {name}.")]
+    public static partial void ModelMissing(ILogger logger, string name);
 
-    [LoggerMessage(EventId = 3001, Level = Microsoft.Extensions.Logging.LogLevel.Information, Message = "Đã tải model {name}: {path}.")]
+    [LoggerMessage(EventId = 3001, Level = Microsoft.Extensions.Logging.LogLevel.Debug, Message = "Đã tải mô hình {name} từ {path}.")]
     public static partial void ModelLoaded(ILogger logger, string name, string path);
 
-    [LoggerMessage(EventId = 3002, Level = Microsoft.Extensions.Logging.LogLevel.Error, Message = "Không thể tải model {name}.")]
+    [LoggerMessage(EventId = 3002, Level = Microsoft.Extensions.Logging.LogLevel.Error, Message = "Không thể tải mô hình {name}.")]
     public static partial void ModelLoadFailed(ILogger logger, string name, Exception exception);
 
-    [LoggerMessage(EventId = 3003, Level = Microsoft.Extensions.Logging.LogLevel.Error, Message = "Inference model {name} thất bại.")]
+    [LoggerMessage(EventId = 3003, Level = Microsoft.Extensions.Logging.LogLevel.Error, Message = "Mô hình {name} không thể hoàn tất nhận diện.")]
     public static partial void InferenceFailed(ILogger logger, string name, Exception exception);
 }

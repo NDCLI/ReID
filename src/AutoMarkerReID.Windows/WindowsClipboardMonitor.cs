@@ -8,7 +8,10 @@ using Microsoft.Extensions.Logging;
 
 namespace AutoMarkerReID.Windows;
 
-public sealed class WindowsClipboardMonitor(IImageCodec codec, ILogger<WindowsClipboardMonitor> logger) : IClipboardMonitor
+public sealed class WindowsClipboardMonitor(
+    IImageCodec codec,
+    ClipboardActivityStats activity,
+    ILogger<WindowsClipboardMonitor> logger) : IClipboardMonitor
 {
     private uint _lastSequence;
     private string _lastFallbackHash = string.Empty;
@@ -43,6 +46,7 @@ public sealed class WindowsClipboardMonitor(IImageCodec codec, ILogger<WindowsCl
             if (Interlocked.Exchange(ref _ignoreNextWrite, 0) != 0)
             {
                 _lastSequence = sequence;
+                activity.RecordSkipped();
                 ClipboardMonitorLog.OwnWriteIgnored(logger, sequence);
                 continue;
             }
@@ -50,6 +54,7 @@ public sealed class WindowsClipboardMonitor(IImageCodec codec, ILogger<WindowsCl
             if (ShouldIgnoreProducer())
             {
                 _lastSequence = sequence;
+                activity.RecordSkipped();
                 ClipboardMonitorLog.ExcelClipboardIgnored(logger, sequence);
                 continue;
             }
@@ -71,6 +76,7 @@ public sealed class WindowsClipboardMonitor(IImageCodec codec, ILogger<WindowsCl
             _lastSequence = sequence;
             if (image is null)
             {
+                activity.RecordSkipped();
                 ClipboardMonitorLog.PayloadUnavailable(logger, sequence);
                 continue;
             }
@@ -104,6 +110,7 @@ public sealed class WindowsClipboardMonitor(IImageCodec codec, ILogger<WindowsCl
         _lastFallbackHash = hash;
         if (Interlocked.Exchange(ref _ignoreNextWrite, 0) != 0)
         {
+            activity.RecordSkipped();
             ClipboardMonitorLog.OwnWriteIgnored(logger, 0);
             return;
         }
@@ -260,15 +267,15 @@ public sealed class WindowsClipboardMonitor(IImageCodec codec, ILogger<WindowsCl
 
 internal static partial class ClipboardMonitorLog
 {
-    [LoggerMessage(EventId = 2000, Level = LogLevel.Debug, Message = "Đã bỏ clipboard do app tự ghi, sequence {sequence}.")]
+    [LoggerMessage(EventId = 2000, Level = LogLevel.Debug, Message = "Đã bỏ qua nội dung Clipboard do ứng dụng tự ghi, mã thay đổi {sequence}.")]
     public static partial void OwnWriteIgnored(ILogger logger, uint sequence);
 
-    [LoggerMessage(EventId = 2001, Level = LogLevel.Debug, Message = "Đã bỏ clipboard Excel, sequence {sequence}.")]
+    [LoggerMessage(EventId = 2001, Level = LogLevel.Debug, Message = "Đã bỏ qua nội dung Clipboard từ Excel, mã thay đổi {sequence}.")]
     public static partial void ExcelClipboardIgnored(ILogger logger, uint sequence);
 
-    [LoggerMessage(EventId = 2002, Level = LogLevel.Warning, Message = "Clipboard sequence {sequence} không có payload ảnh sau thời gian retry.")]
+    [LoggerMessage(EventId = 2002, Level = LogLevel.Warning, Message = "Không đọc được ảnh từ Clipboard sau nhiều lần thử, mã thay đổi {sequence}.")]
     public static partial void PayloadUnavailable(ILogger logger, uint sequence);
 
-    [LoggerMessage(EventId = 2003, Level = LogLevel.Debug, Message = "Đã queue clipboard sequence {sequence}, hash {hash}.")]
+    [LoggerMessage(EventId = 2003, Level = LogLevel.Debug, Message = "Đã đưa ảnh từ Clipboard vào hàng đợi, mã thay đổi {sequence}, mã ảnh {hash}.")]
     public static partial void ImageQueued(ILogger logger, uint sequence, string hash);
 }

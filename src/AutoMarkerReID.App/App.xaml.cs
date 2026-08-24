@@ -22,7 +22,7 @@ public partial class App : System.Windows.Application
         _singleInstance = SingleInstanceGuard.TryAcquire("AutoMarkerReID-CSharp");
         if (!_singleInstance.IsOwner)
         {
-            DarkMessageBox.Show(null, "AutoMarker Re-ID đang chạy trong System Tray.", "AutoMarker Re-ID", MessageBoxButton.OK, MessageBoxImage.Information);
+            DarkMessageBox.Show(null, "AutoMarker Re-ID đang chạy trong khay hệ thống.", "AutoMarker Re-ID", MessageBoxButton.OK, MessageBoxImage.Information);
             Shutdown();
             return;
         }
@@ -65,7 +65,14 @@ public partial class App : System.Windows.Application
     {
         services.AddSingleton(paths);
         services.AddSingleton(new ModelLocations(paths.Models));
-        services.AddSingleton<UserSelectionState>();
+        services.AddSingleton<UserPreferencesStore>();
+        services.AddSingleton(provider =>
+        {
+            var selection = new UserSelectionState();
+            provider.GetRequiredService<UserPreferencesStore>().Apply(selection);
+            return selection;
+        });
+        services.AddSingleton<ClipboardActivityStats>();
         services.AddSingleton<QueryCatalog>();
         services.AddSingleton<ObservableLogStore>();
         services.AddSingleton<ILoggerProvider, ObservableLogProvider>();

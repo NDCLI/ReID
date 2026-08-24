@@ -20,6 +20,8 @@ public sealed partial class OpenVinoOcrService : IOcrService, IAsyncDisposable
     private CompiledModel? _model;
     private bool _disabled;
 
+    public bool IsReady => _model is not null && !_disabled;
+
     public OpenVinoOcrService(string modelPath, string dictionaryPath, ILogger<OpenVinoOcrService> logger)
     {
         _modelPath = modelPath;
@@ -249,9 +251,9 @@ public sealed partial class OpenVinoOcrService : IOcrService, IAsyncDisposable
 
 internal static partial class OpenVinoOcrLog
 {
-    [LoggerMessage(EventId = 3300, Level = Microsoft.Extensions.Logging.LogLevel.Information, Message = "Đã tải OCR model {path}.")]
+    [LoggerMessage(EventId = 3300, Level = Microsoft.Extensions.Logging.LogLevel.Debug, Message = "Đã tải mô hình OCR từ {path}.")]
     public static partial void Loaded(ILogger logger, string path);
 
-    [LoggerMessage(EventId = 3301, Level = Microsoft.Extensions.Logging.LogLevel.Error, Message = "OCR OpenVINO bị vô hiệu hóa sau lỗi runtime.")]
+    [LoggerMessage(EventId = 3301, Level = Microsoft.Extensions.Logging.LogLevel.Error, Message = "OCR OpenVINO đã tạm ngừng hoạt động sau lỗi xử lý.")]
     public static partial void Disabled(ILogger logger, Exception exception);
 }

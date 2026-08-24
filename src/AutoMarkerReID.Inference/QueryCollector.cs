@@ -33,7 +33,7 @@ public sealed class QueryCollector(
                     DuplicateHasher.HammingDistance(fingerprint.PerceptualHash, other.PerceptualHash) <= 5 ||
                     DuplicateHasher.HammingDistance(fingerprint.DifferenceHash, other.DifferenceHash) <= 5)
                 {
-                    return new(false, $"trùng với {Path.GetFileName(existingPath)}");
+                    return new(false, $"ảnh bị trùng hoặc quá giống {Path.GetFileName(existingPath)}");
                 }
             }
             catch (InvalidDataException)

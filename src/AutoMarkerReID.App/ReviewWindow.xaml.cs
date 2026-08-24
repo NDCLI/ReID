@@ -32,6 +32,7 @@ public partial class ReviewWindow : Window
         ImageSurface.Height = session.Original.Height;
         BoxCanvas.Width = session.Original.Width;
         BoxCanvas.Height = session.Original.Height;
+        DiagnosticsList.ItemsSource = BuildDiagnostics(session);
         RenderBoxes();
     }
 
@@ -83,8 +84,40 @@ public partial class ReviewWindow : Window
             Canvas.SetLeft(border, box.X1);
             Canvas.SetTop(border, box.Y1);
             BoxCanvas.Children.Add(border);
+            var label = new TextBlock
+            {
+                Text = $"{match.QueryId} · {match.Score:P0}",
+                Foreground = System.Windows.Media.Brushes.White,
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(210, 185, 28, 28)),
+                Padding = new Thickness(4, 1, 4, 1),
+                FontSize = 11,
+                IsHitTestVisible = false,
+            };
+            Canvas.SetLeft(label, box.X1);
+            Canvas.SetTop(label, Math.Max(0, box.Y1 - 20));
+            BoxCanvas.Children.Add(label);
         }
-        SummaryText.Text = $"{_matches.Count} khung · Click trái card để thêm/xóa · Chuột phải để lưu";
+        SummaryText.Text = $"{_matches.Count} khung · Nhấp trái vào thẻ để thêm hoặc xóa khung · Nhấp phải để lưu";
+    }
+
+    private static string[] BuildDiagnostics(ReviewSession session)
+    {
+        if (session.Explanations is not { Count: > 0 })
+            return ["Không có đối tượng nào đủ dữ liệu để phân tích."];
+
+        return session.Explanations
+            .OrderByDescending(item => item.Accepted)
+            .ThenByDescending(item => item.Score)
+            .Select(item =>
+            {
+                var models = item.ModelScores.Count == 0
+                    ? "mô hình: không có dữ liệu"
+                    : "mô hình: " + string.Join(", ", item.ModelScores.OrderBy(pair => pair.Key)
+                        .Select(pair => $"{pair.Key} {pair.Value:P0}"));
+                var state = item.Accepted ? "NHẬN" : "LOẠI";
+                var query = item.QueryId ?? "Không xác định";
+                return $"[{state}] {query} · độ tương đồng {item.Score:P0} / ngưỡng {item.Threshold:P0} · {models} · {item.Reason}";
+            }).ToArray();
     }
 
     private void OnSaveClick(object sender, RoutedEventArgs e)
