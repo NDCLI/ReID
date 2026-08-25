@@ -35,6 +35,17 @@ public sealed class GeometryAndPolicyTests
     }
 
     [Fact]
+    public void IdentityPolicyOnlyRescuesNearThresholdWhenTimestampAndStrongReferenceMatch()
+    {
+        var nearThreshold = Score(0.644f, 0f, 0.96f);
+
+        Assert.True(IdentityDecisionPolicy.Decide(nearThreshold, 0.65f, false, timestampMatched: true).Accepted);
+        Assert.False(IdentityDecisionPolicy.Decide(nearThreshold, 0.65f, false, timestampMatched: false).Accepted);
+        Assert.False(IdentityDecisionPolicy.Decide(Score(0.63f, 0f, 0.96f), 0.65f, false, timestampMatched: true).Accepted);
+        Assert.False(IdentityDecisionPolicy.Decide(Score(0.644f, 0f, 0.89f), 0.65f, false, timestampMatched: true).Accepted);
+    }
+
+    [Fact]
     public void PostProcessorChoosesDominantIdentityRemovesSourceAndHonorsAutomaticReferenceLimit()
     {
         var source = new BoundingBox(0, 0, 100, 100);

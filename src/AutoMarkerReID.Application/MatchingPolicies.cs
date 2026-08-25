@@ -18,7 +18,11 @@ public sealed record IdentityDecision(bool Accepted, string? QueryId, MatchSourc
 
 public static class IdentityDecisionPolicy
 {
-    public static IdentityDecision Decide(IdentityScore score, float calibratedThreshold, bool appearanceEnabled)
+    public static IdentityDecision Decide(
+        IdentityScore score,
+        float calibratedThreshold,
+        bool appearanceEnabled,
+        bool timestampMatched = false)
     {
         var modelAgreement = score.ModelWinners.Values.Distinct(StringComparer.OrdinalIgnoreCase).Count() <= 1;
         var margin = score.EnsembleScore - score.RunnerUpScore;
@@ -33,6 +37,13 @@ public static class IdentityDecisionPolicy
         if (score.FaceScore >= ReIdDefaults.FaceMatchThreshold && score.FaceMargin >= ReIdDefaults.FaceMatchMargin)
         {
             return new IdentityDecision(true, score.QueryId, MatchSource.Face, "face rescue");
+        }
+
+        if (timestampMatched && modelAgreement && margin >= ReIdDefaults.AiMatchMargin &&
+            score.EnsembleScore >= calibratedThreshold - ReIdDefaults.TimestampRescueTolerance &&
+            score.BestReferenceScore >= ReIdDefaults.TimestampRescueBestReferenceThreshold)
+        {
+            return new IdentityDecision(true, score.QueryId, MatchSource.Body, "timestamp rescue");
         }
 
         if (appearanceEnabled && bodyAbsolute && strongReference && modelAgreement &&

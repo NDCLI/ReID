@@ -21,6 +21,8 @@ public static class ReIdDefaults
     public const float AiMatchThreshold = 0.68f;
     public const float AiMatchMargin = 0.06f;
     public const float BestReferenceThreshold = 0.62f;
+    public const float TimestampRescueTolerance = 0.01f;
+    public const float TimestampRescueBestReferenceThreshold = 0.90f;
     public const int TopReferenceCount = 2;
     public const float FaceDetectionThreshold = 0.75f;
     public const float FaceMatchThreshold = 0.65f;

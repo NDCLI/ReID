@@ -132,7 +132,9 @@ public sealed class OpenVinoMatchEngine(
                     appearanceScore,
                     appearanceMargin);
                 var threshold = selection.MatchThresholdOverride ?? winner.Query.CalibratedThreshold;
-                var decision = IdentityDecisionPolicy.Decide(score, threshold, selection.AppearanceEnabled);
+                var timestampMatched = timestamp is not null &&
+                                       string.Equals(timestamp, winner.BestReference?.Timestamp, StringComparison.OrdinalIgnoreCase);
+                var decision = IdentityDecisionPolicy.Decide(score, threshold, selection.AppearanceEnabled, timestampMatched);
                 var acceptedByGates = decision.Accepted && decision.Source is not null;
                 var reason = ExplainDecision(decision, score, threshold);
                 if (!decision.Accepted || decision.Source is null)
@@ -187,6 +189,11 @@ public sealed class OpenVinoMatchEngine(
     {
         if (decision.Accepted)
         {
+            if (decision.Reason == "timestamp rescue")
+            {
+                return "Đạt nhờ timestamp khớp và reference rất mạnh.";
+            }
+
             return decision.Source switch
             {
                 MatchSource.Face => "Đạt nhờ đối chiếu khuôn mặt.",

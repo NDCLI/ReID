@@ -46,7 +46,7 @@ if (parsed.SingleFile is { } file)
     if (!File.Exists(file)) throw new FileNotFoundException("Không tìm thấy ảnh --single.", file);
     var codec = host.Services.GetRequiredService<IImageCodec>();
     var image = codec.Decode(await File.ReadAllBytesAsync(file));
-    await ProcessAsync(ImageJob.Create(image, ImageJobSource.CommandLine, Path.GetFullPath(file)), processor, repository, renderer, parsed.DebugWindow, CancellationToken.None);
+    await ProcessAsync(ImageJob.Create(image, ImageJobSource.CommandLine, Path.GetFullPath(file)), processor, repository, renderer, parsed.DebugWindow, parsed.Verbose, CancellationToken.None);
     return 0;
 }
 
@@ -62,7 +62,7 @@ try
 {
     await monitor.RunAsync(async (job, token) =>
     {
-        await ProcessAsync(job, processor, repository, renderer, parsed.DebugWindow, token);
+        await ProcessAsync(job, processor, repository, renderer, parsed.DebugWindow, parsed.Verbose, token);
     }, shutdown.Token);
 }
 catch (OperationCanceledException) when (shutdown.IsCancellationRequested)
@@ -76,6 +76,7 @@ static async Task ProcessAsync(
     IResultRepository repository,
     IBoxRenderer renderer,
     bool debugWindow,
+    bool verbose,
     CancellationToken cancellationToken)
 {
     var result = await processor.ProcessAsync(job, cancellationToken);
@@ -88,6 +89,15 @@ static async Task ProcessAsync(
             Console.WriteLine($"Đã thêm ảnh tham chiếu vào {collected.QueryId}: {collected.ImagePath}");
             break;
         case ProcessingResult.ReviewRequired review:
+            if (verbose)
+            {
+                foreach (var item in review.Session.Explanations ?? [])
+                {
+                    Console.WriteLine($"Card ({item.BoundingBox.X1},{item.BoundingBox.Y1})-({item.BoundingBox.X2},{item.BoundingBox.Y2}): " +
+                                      $"{(item.Accepted ? "GIỮ" : "LOẠI")}, Query={item.QueryId ?? "-"}, " +
+                                      $"score={item.Score:F4}, threshold={item.Threshold:F4}, bestRef={item.BestReferenceScore:F4}; {item.Reason}");
+                }
+            }
             var saved = await repository.SaveAsync(review.Session, cancellationToken);
             Console.WriteLine($"Đã lưu {review.Session.Matches.Count} khung: {saved.MarkedImagePath}");
             if (debugWindow)
