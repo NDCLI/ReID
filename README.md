@@ -34,7 +34,6 @@ Hai lựa chọn Query là độc lập:
 | `F2` | Chọn Query trống để lưu ảnh tham chiếu (chỉ khi Blaze hoặc Excel đang foreground) |
 | `F3` | Chọn Root/Tất cả Query để nhận diện |
 | `F4` / `F5` | Chuyển Query nhận diện trước / tiếp theo |
-| `Ctrl+Shift+1..9` | Chọn Query nhận diện theo vị trí |
 | `Alt+PrintScreen` | Chụp vùng mới |
 | `Alt+S` | Chụp lại vùng gần nhất |
 | `Ctrl+Alt+Shift+F10` | Trigger capture dự phòng cho tích hợp Blaze/AHK |

@@ -391,7 +391,6 @@ JSON được ghi vào file `.tmp`, `flush` + `fsync`, rồi `os.replace` để 
 | `F4` | Query trước | Có quay vòng |
 | `F5` | Query tiếp theo | Có quay vòng |
 | `F3` | Chọn Root/Tất cả |  |
-| `Ctrl+Shift+1..9` | Chọn Query theo vị trí | Chỉ chọn nếu vị trí tồn tại |
 | `F2` | Chọn Query trống | Chỉ thực thi khi foreground là Blaze hoặc Excel |
 | `Alt+PrintScreen` | Chọn vùng chụp mới | Nếu bị chiếm, thử `Ctrl+Alt+PrintScreen`, sau đó `Ctrl+Alt+Shift+R` |
 | `Alt+S` | Chụp lại vùng gần nhất |  |

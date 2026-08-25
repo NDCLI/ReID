@@ -356,8 +356,6 @@ public partial class MainWindow : Window, IDisposable
         Register("NextQuery", HotkeyModifiers.None, Key.F5);
         Register("RootQuery", HotkeyModifiers.None, Key.F3);
         Register("EmptyQuery", HotkeyModifiers.None, Key.F2);
-        for (var index = 1; index <= 9; index++)
-            Register($"Query{index}", HotkeyModifiers.Control | HotkeyModifiers.Shift, (Key)((int)Key.D0 + index));
         Register("RepeatCapture", HotkeyModifiers.Alt, Key.S);
         Register("IntegrationCapture", HotkeyModifiers.Control | HotkeyModifiers.Alt | HotkeyModifiers.Shift, Key.F10);
 
