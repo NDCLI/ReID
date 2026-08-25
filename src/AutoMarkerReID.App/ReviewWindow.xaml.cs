@@ -32,7 +32,6 @@ public partial class ReviewWindow : Window
         ImageSurface.Height = session.Original.Height;
         BoxCanvas.Width = session.Original.Width;
         BoxCanvas.Height = session.Original.Height;
-        DiagnosticsList.ItemsSource = BuildDiagnostics(session);
         RenderBoxes();
     }
 
@@ -100,7 +99,7 @@ public partial class ReviewWindow : Window
         SummaryText.Text = $"{_matches.Count} khung · Nhấp trái vào thẻ để thêm hoặc xóa khung · Nhấp phải để lưu";
     }
 
-    private static string[] BuildDiagnostics(ReviewSession session)
+    internal static string[] BuildDiagnostics(ReviewSession session)
     {
         if (session.Explanations is not { Count: > 0 })
             return ["Không có đối tượng nào đủ dữ liệu để phân tích."];

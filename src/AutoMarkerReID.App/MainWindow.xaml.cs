@@ -8,6 +8,7 @@ using System.Windows.Input;
 using AutoMarkerReID.Application;
 using AutoMarkerReID.Domain;
 using AutoMarkerReID.Windows;
+using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using Forms = System.Windows.Forms;
 
@@ -15,6 +16,8 @@ namespace AutoMarkerReID.App;
 
 public partial class MainWindow : Window, IDisposable
 {
+    private static readonly Action<ILogger, string, Exception?> LogReviewDiagnostic = LoggerMessage.Define<string>(
+        LogLevel.Information, new EventId(1, "ReviewDiagnostic"), "{Diagnostic}");
     private readonly ApplicationController _controller;
     private readonly IScreenCaptureService _captureService;
     private readonly IClipboardMonitor _clipboardMonitor;
@@ -27,6 +30,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly IResultRepository _resultRepository;
     private readonly IBoxRenderer _boxRenderer;
     private readonly IQueryRepository _queryRepository;
+    private readonly ILogger<MainWindow> _logger;
     private readonly Forms.NotifyIcon _trayIcon;
     private System.Drawing.Icon _trayDrawingIcon;
     private readonly Forms.ContextMenuStrip _trayMenu;
@@ -49,7 +53,8 @@ public partial class MainWindow : Window, IDisposable
         IInterfaceDetector interfaceDetector,
         IResultRepository resultRepository,
         IBoxRenderer boxRenderer,
-        IQueryRepository queryRepository)
+        IQueryRepository queryRepository,
+        ILogger<MainWindow> logger)
     {
         _controller = controller;
         _captureService = captureService;
@@ -63,6 +68,7 @@ public partial class MainWindow : Window, IDisposable
         _resultRepository = resultRepository;
         _boxRenderer = boxRenderer;
         _queryRepository = queryRepository;
+        _logger = logger;
         InitializeComponent();
         WindowsDarkMode.Apply(this);
         DataContext = viewModel;
@@ -223,6 +229,8 @@ public partial class MainWindow : Window, IDisposable
         {
             var best = args.Session.Matches.OrderByDescending(match => match.Score).FirstOrDefault();
             ShowOsd(best is null ? "Không có kết quả đạt ngưỡng" : $"{best.QueryId} · {best.Score:P0}");
+            foreach (var diagnostic in ReviewWindow.BuildDiagnostics(args.Session))
+                LogReviewDiagnostic(_logger, diagnostic, null);
             var review = new ReviewWindow(args.Session, _candidateGenerator, _selection, _codec, _boxRenderer) { Owner = IsVisible ? this : null };
             review.ShowDialog();
             args.Complete(review.Outcome ?? new ReviewOutcome(ReviewDecision.Cancel));
