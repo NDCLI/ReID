@@ -11,20 +11,18 @@ namespace AutoMarkerReID.App;
 public partial class ReviewWindow : Window
 {
     private readonly ReviewSession _session;
-    private readonly IReadOnlyList<CardCandidate> _cards;
     private readonly UserSelectionState _selection;
     private readonly IImageCodec _codec;
     private readonly IBoxRenderer _boxRenderer;
     private readonly List<MatchResult> _matches;
 
-    public ReviewWindow(ReviewSession session, ICandidateGenerator candidateGenerator, UserSelectionState selection, IImageCodec codec, IBoxRenderer boxRenderer)
+    public ReviewWindow(ReviewSession session, UserSelectionState selection, IImageCodec codec, IBoxRenderer boxRenderer)
     {
         _session = session;
         _selection = selection;
         _codec = codec;
         _boxRenderer = boxRenderer;
         _matches = [.. session.Matches];
-        _cards = candidateGenerator.Generate(session.Original);
         InitializeComponent();
         WindowsDarkMode.Apply(this);
         PreviewImage.Source = WpfImageConversion.ToBitmapSource(session.Original);
@@ -48,12 +46,11 @@ public partial class ReviewWindow : Window
             return;
         }
 
-        var card = _cards.FirstOrDefault(candidate => candidate.BoundingBox.Contains((int)point.X, (int)point.Y));
+        var card = _boxRenderer.FindCardAtPoint(_session.Original, (int)Math.Round(point.X), (int)Math.Round(point.Y));
         if (card is null) return;
         var queryId = _matches.GroupBy(match => match.QueryId).OrderByDescending(group => group.Count()).Select(group => group.Key).FirstOrDefault()
                       ?? _selection.RecognitionScope ?? _selection.TargetQuery;
-        var snapped = _boxRenderer.SnapToCard(_session.Original, card.BoundingBox);
-        _matches.Add(new MatchResult(queryId, null, snapped, 1, null, null, card.PixelScore,
+        _matches.Add(new MatchResult(queryId, null, card.Value, 1, null, null, 1,
             new Dictionary<string, float>(), null, MatchSource.Manual, true));
         ApplyBoxSpacing();
         RenderBoxes();

@@ -231,7 +231,7 @@ public partial class MainWindow : Window, IDisposable
             ShowOsd(best is null ? "Không có kết quả đạt ngưỡng" : $"{best.QueryId} · {best.Score:P0}");
             foreach (var diagnostic in ReviewWindow.BuildDiagnostics(args.Session))
                 LogReviewDiagnostic(_logger, diagnostic, null);
-            var review = new ReviewWindow(args.Session, _candidateGenerator, _selection, _codec, _boxRenderer)
+            var review = new ReviewWindow(args.Session, _selection, _codec, _boxRenderer)
             {
                 Owner = IsVisible ? this : null,
                 WindowState = WindowState.Normal,

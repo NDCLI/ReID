@@ -11,6 +11,14 @@ public sealed class OpenCvCandidateGenerator : ICandidateGenerator
         using var source = MatConversion.ToMat(screenshot);
         using var gray = new Mat();
         Cv2.CvtColor(source, gray, source.Channels() == 4 ? ColorConversionCodes.BGRA2GRAY : ColorConversionCodes.BGR2GRAY);
+        var regularGrid = DetectRegularGrid(gray);
+        if (regularGrid.Count >= 4)
+        {
+            regularGrid = regularGrid.Take(ReIdDefaults.FastMaxCards).ToList();
+            regularGrid[0] = regularGrid[0] with { IsSource = true };
+            return regularGrid;
+        }
+
         using var blurred = new Mat();
         Cv2.GaussianBlur(gray, blurred, new Size(3, 3), 0);
         using var edges = new Mat();
@@ -56,6 +64,7 @@ public sealed class OpenCvCandidateGenerator : ICandidateGenerator
         var withRows = acceptedRows
             .OrderBy(candidate => candidate.Row)
             .ThenBy(candidate => candidate.BoundingBox.X1)
+            .Take(ReIdDefaults.FastMaxCards)
             .ToList();
 
         if (withRows.Count >= 4)
@@ -69,6 +78,120 @@ public sealed class OpenCvCandidateGenerator : ICandidateGenerator
         }
 
         return withRows;
+    }
+
+    private static List<CardCandidate> DetectRegularGrid(Mat gray)
+    {
+        var screenHeight = gray.Rows;
+        var screenWidth = gray.Cols;
+        var contentX = (int)(screenWidth * 0.30);
+        var minimumBandHeight = Math.Max(80, (int)(screenHeight * 0.15));
+        var rowBands = new List<(int Top, int Bottom)>();
+        int? bandStart = null;
+        for (var y = 0; y < screenHeight; y++)
+        {
+            var activePixels = 0;
+            for (var x = contentX; x < screenWidth; x++)
+            {
+                if (gray.At<byte>(y, x) > 45) activePixels++;
+            }
+
+            var active = activePixels / (double)Math.Max(1, screenWidth - contentX) > 0.12;
+            if (active && bandStart is null)
+            {
+                bandStart = y;
+            }
+            else if (!active && bandStart is { } start)
+            {
+                if (y - start >= minimumBandHeight) rowBands.Add((start, y));
+                bandStart = null;
+            }
+        }
+
+        if (bandStart is { } finalStart && screenHeight - finalStart >= minimumBandHeight)
+            rowBands.Add((finalStart, screenHeight));
+        rowBands = rowBands.Take(ReIdDefaults.FastMaxRows).ToList();
+        if (rowBands.Count == 0) return [];
+
+        var minimumCardWidth = (int)(screenWidth * 0.04);
+        var maximumCardWidth = (int)(screenWidth * 0.14);
+        List<(int Left, int Right)> RowSegments((int Top, int Bottom) row)
+        {
+            var scanTop = Math.Min(row.Top + 6, row.Bottom - 1);
+            var scanBottom = Math.Min(row.Top + 28, row.Bottom);
+            if (scanBottom <= scanTop) return [];
+
+            var segments = new List<(int Left, int Right)>();
+            int? segmentStart = null;
+            for (var x = (int)(screenWidth * 0.28); x < screenWidth; x++)
+            {
+                var active = false;
+                for (var y = scanTop; y < scanBottom; y++)
+                {
+                    if (gray.At<byte>(y, x) <= 30) continue;
+                    active = true;
+                    break;
+                }
+
+                if (active && segmentStart is null)
+                {
+                    segmentStart = x;
+                }
+                else if (!active && segmentStart is { } start)
+                {
+                    if (x - start >= minimumCardWidth && x - start <= maximumCardWidth)
+                        segments.Add((start, x));
+                    segmentStart = null;
+                }
+            }
+
+            if (segmentStart is { } finalSegment &&
+                screenWidth - finalSegment >= minimumCardWidth &&
+                screenWidth - finalSegment <= maximumCardWidth)
+                segments.Add((finalSegment, screenWidth));
+            return segments;
+        }
+
+        var portraitMaximum = (int)(screenWidth * 0.09);
+        var modelSegments = rowBands
+            .Select(RowSegments)
+            .Select(segments => segments.Where(segment => segment.Right - segment.Left <= portraitMaximum).ToList())
+            .OrderByDescending(segments => segments.Count)
+            .FirstOrDefault() ?? [];
+        if (modelSegments.Count < 4) return [];
+
+        var cardWidth = Median(modelSegments.Select(segment => segment.Right - segment.Left));
+        var starts = modelSegments.Select(segment => segment.Left).Order().ToArray();
+        var pitches = starts.Zip(starts.Skip(1), (left, right) => right - left)
+            .Where(pitch => pitch < cardWidth * 1.5)
+            .ToArray();
+        var pitch = pitches.Length == 0 ? cardWidth + 4 : Median(pitches);
+        var firstX = starts[0];
+        if (cardWidth < 40 || pitch <= cardWidth || pitch > cardWidth * 1.4) return [];
+
+        List<(int Left, int Right)> ProjectedColumns()
+        {
+            var columns = new List<(int Left, int Right)>();
+            for (var x = firstX; x + cardWidth <= screenWidth && columns.Count < 20; x += pitch)
+                columns.Add((x, Math.Min(screenWidth, x + cardWidth)));
+            return columns;
+        }
+
+        var result = new List<CardCandidate>();
+        for (var row = 0; row < rowBands.Count; row++)
+        {
+            var columns = RowSegments(rowBands[row]);
+            if (columns.Count < 4) columns = ProjectedColumns();
+            foreach (var column in columns)
+            {
+                result.Add(new CardCandidate(
+                    new BoundingBox(column.Left, rowBands[row].Top, column.Right, rowBands[row].Bottom),
+                    1f,
+                    row));
+            }
+        }
+
+        return result;
     }
 
     private static List<CardCandidate> NonMaximumSuppression(List<CardCandidate> candidates, float threshold)
@@ -190,6 +313,97 @@ public sealed class OpenCvBoxRenderer : IBoxRenderer
         var right = FindOuterHorizontalEdge(gray, edges, clamped.X2, radius, sampleTop, sampleBottom, false);
         var snapped = new BoundingBox(left, clamped.Y1, right, clamped.Y2).Clamp(image.Width, image.Height);
         return snapped.Width <= clamped.Width * 1.6 ? snapped : clamped;
+    }
+
+    public BoundingBox? FindCardAtPoint(ImageFrame image, int x, int y)
+    {
+        if (x < 0 || x >= image.Width || y < 0 || y >= image.Height) return null;
+
+        var allowedRows = new OpenCvCandidateGenerator().Generate(image)
+            .GroupBy(candidate => candidate.Row)
+            .OrderBy(row => row.Key)
+            .Take(ReIdDefaults.FastMaxRows)
+            .Select(row => (Top: row.Min(candidate => candidate.BoundingBox.Y1),
+                            Bottom: row.Max(candidate => candidate.BoundingBox.Y2)))
+            .ToArray();
+        if (allowedRows.Length > 0 && !allowedRows.Any(row => y >= row.Top && y <= row.Bottom)) return null;
+
+        using var mat = MatConversion.ToMat(image);
+        using var gray = new Mat();
+        Cv2.CvtColor(mat, gray, mat.Channels() == 4 ? ColorConversionCodes.BGRA2GRAY : ColorConversionCodes.BGR2GRAY);
+        var checkTop = Math.Max(0, y - 3);
+        var checkBottom = Math.Min(image.Height, y + 4);
+        var (seedLeft, seedRight) = CardInsetX(gray, x, checkTop, checkBottom);
+        if (seedRight - seedLeft < ReIdDefaults.ClickBoxMinimumSize) return null;
+
+        var snapped = SnapClickedBoxToCard(gray, new BoundingBox(seedLeft, y, seedRight, Math.Min(image.Height, y + 1)));
+        return snapped.Width < ReIdDefaults.ClickBoxMinimumSize || snapped.Height < ReIdDefaults.ClickBoxMinimumSize
+            ? null
+            : snapped;
+    }
+
+    private static BoundingBox SnapClickedBoxToCard(Mat gray, BoundingBox approximate)
+    {
+        var width = gray.Cols;
+        var height = gray.Rows;
+        var x1 = Math.Clamp(approximate.X1, 0, width - 1);
+        var x2 = Math.Clamp(approximate.X2, x1 + 1, width);
+        var y1 = Math.Clamp(approximate.Y1, 0, height - 1);
+        var y2 = Math.Clamp(approximate.Y2, y1 + 1, height - 1);
+        while (y1 > 0 && RowMean(gray, y1, x1, x2) > 32) y1--;
+        while (y2 < height - 1 && RowMean(gray, y2, x1, x2) > 32) y2++;
+
+        var checkTop = y1 + (y2 - y1) / 4;
+        var checkBottom = y2 - (y2 - y1) / 4;
+        if (checkBottom <= checkTop)
+        {
+            checkTop = y1;
+            checkBottom = Math.Max(y1 + 1, y2);
+        }
+
+        var (left, right) = CardInsetX(gray, (x1 + x2) / 2, checkTop, checkBottom);
+        return new BoundingBox(left, y1, right, y2).Clamp(width, height);
+    }
+
+    private static (int Left, int Right) CardInsetX(Mat gray, int middleX, int checkTop, int checkBottom)
+    {
+        var width = gray.Cols;
+        var gapLeft = middleX;
+        while (gapLeft > 0 && !IsDarkUniformColumn(gray, gapLeft, checkTop, checkBottom)) gapLeft--;
+        var cardStart = gapLeft > 0 ? gapLeft + 1 : 0;
+        var imageEdgeLeft = cardStart;
+        for (var x = cardStart; x < middleX; x++)
+        {
+            if (IsDarkUniformColumn(gray, x, checkTop, checkBottom)) continue;
+            imageEdgeLeft = x;
+            break;
+        }
+
+        var gapRight = middleX;
+        while (gapRight < width - 1 && !IsDarkUniformColumn(gray, gapRight, checkTop, checkBottom)) gapRight++;
+        var cardEnd = gapRight < width - 1 ? gapRight - 1 : width - 1;
+        var imageEdgeRight = cardEnd;
+        for (var x = cardEnd; x > middleX; x--)
+        {
+            if (IsDarkUniformColumn(gray, x, checkTop, checkBottom)) continue;
+            imageEdgeRight = x;
+            break;
+        }
+
+        return (Math.Min(cardStart + 6, imageEdgeLeft), Math.Max(cardEnd - 6, imageEdgeRight));
+    }
+
+    private static bool IsDarkUniformColumn(Mat gray, int x, int top, int bottom)
+    {
+        using var column = new Mat(gray, new Rect(x, top, 1, Math.Max(1, bottom - top)));
+        Cv2.MeanStdDev(column, out var mean, out var deviation);
+        return mean.Val0 < 26 && deviation.Val0 * deviation.Val0 < 5;
+    }
+
+    private static double RowMean(Mat gray, int y, int left, int right)
+    {
+        using var row = new Mat(gray, new Rect(left, y, Math.Max(1, right - left), 1));
+        return Cv2.Mean(row).Val0;
     }
 
     private static int FindOuterHorizontalEdge(Mat gray, Mat edges, int expected, int radius,

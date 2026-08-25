@@ -61,7 +61,7 @@ public sealed class GeometryAndPolicyTests
     }
 
     [Fact]
-    public void PostProcessorKeepsThreeRowsAndSpacesAdjacentBoxes()
+    public void PostProcessorKeepsOnlyTopTwoRowsAndSpacesAdjacentBoxes()
     {
         var matches = new[]
         {
@@ -77,8 +77,9 @@ public sealed class GeometryAndPolicyTests
 
         var result = MatchPostProcessor.Apply(matches, queries);
 
-        Assert.Equal(4, result.Count);
-        Assert.Equal(3, result.Select(item => item.BoundingBox.CenterY).Distinct().Count());
+        Assert.Equal(3, result.Count);
+        Assert.Equal(2, result.Select(item => item.BoundingBox.CenterY).Distinct().Count());
+        Assert.DoesNotContain(result, item => item.BoundingBox.Y1 == 280);
         var firstRow = result.Where(item => item.BoundingBox.Y1 == 0).OrderBy(item => item.BoundingBox.X1).ToArray();
         Assert.True(firstRow[1].BoundingBox.X1 - firstRow[0].BoundingBox.X2 >= ReIdDefaults.BoxMinimumGap);
     }

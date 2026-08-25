@@ -28,7 +28,8 @@ public static class ReIdDefaults
     public const float FastShortlistThreshold = 0.45f;
     public const float FastFallbackShortlistThreshold = 0.35f;
     public const int FastFallbackMaxCards = 5;
-    public const int FastMaxRows = 3;
+    public const int FastMaxRows = 2;
+    public const int FastMaxCards = 20;
     public const int MaxPixelCandidates = 150;
     public const float IgnoreLeftRatio = 0.25f;
     public const float IgnoreBottomRatio = 0f;
@@ -37,4 +38,5 @@ public static class ReIdDefaults
     public const float AppearanceMargin = 0.02f;
     public const int BoxThickness = 2;
     public const int BoxMinimumGap = 4;
+    public const int ClickBoxMinimumSize = 20;
 }

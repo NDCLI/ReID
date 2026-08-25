@@ -120,6 +120,7 @@ public interface IBoxRenderer
 {
     ImageFrame Draw(ImageFrame image, IReadOnlyList<MatchResult> matches);
     BoundingBox SnapToCard(ImageFrame image, BoundingBox approximate);
+    BoundingBox? FindCardAtPoint(ImageFrame image, int x, int y);
 }
 
 public sealed record CardCandidate(BoundingBox BoundingBox, float PixelScore, int Row, bool IsSource = false);

@@ -124,30 +124,6 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void CopyDiagnostics()
-    {
-        var references = _catalog.Snapshot.Values.Sum(query => query.References.Count);
-        var lines = new[]
-        {
-            $"AutoMarker Re-ID {typeof(MainViewModel).Assembly.GetName().Version}",
-            $"Trạng thái: {StatusText}",
-            $"Mô hình nhận diện người: {(_runtime.ActiveBodyModels.Count == 0 ? "không có" : string.Join(", ", _runtime.ActiveBodyModels))}",
-            $"OCR: {(_ocr.IsReady ? "sẵn sàng" : "không sẵn sàng")}",
-            $"Query: {_catalog.Snapshot.Count}; ảnh tham chiếu: {references}",
-            $"Clipboard: {ClipboardSummary}",
-        };
-        try
-        {
-            System.Windows.Clipboard.SetText(string.Join(Environment.NewLine, lines));
-            SelectionFeedback?.Invoke(this, "Đã sao chép thông tin kiểm tra");
-        }
-        catch (System.Runtime.InteropServices.COMException)
-        {
-            SelectionFeedback?.Invoke(this, "Clipboard đang bận, chưa thể sao chép thông tin kiểm tra");
-        }
-    }
-
-    [RelayCommand]
     private async Task RebuildCacheAsync()
     {
         if (ConfirmCacheRebuild?.Invoke() == false) return;

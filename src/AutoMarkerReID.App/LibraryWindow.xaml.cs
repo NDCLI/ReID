@@ -126,11 +126,10 @@ public partial class LibraryWindow : Window
         if (existing >= 0) _matches.RemoveAt(existing);
         else
         {
-            var card = _candidates.Generate(_original).FirstOrDefault(item => item.BoundingBox.Contains((int)point.X, (int)point.Y));
+            var card = _renderer.FindCardAtPoint(_original, (int)Math.Round(point.X), (int)Math.Round(point.Y));
             if (card is null) return;
             var query = _current.DominantQueryId ?? "Manual";
-            var snapped = _renderer.SnapToCard(_original, card.BoundingBox);
-            _matches.Add(new MatchResult(query, null, snapped, 1, null, null, card.PixelScore,
+            _matches.Add(new MatchResult(query, null, card.Value, 1, null, null, 1,
                 new Dictionary<string, float>(), null, MatchSource.Manual, true));
             var spaced = MatchPostProcessor.EnsureMinimumHorizontalGap(_matches);
             _matches.Clear();

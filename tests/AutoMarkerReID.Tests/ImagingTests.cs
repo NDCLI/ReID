@@ -138,15 +138,34 @@ public sealed class ImagingTests
     }
 
     [Fact]
-    public void CandidateGeneratorKeepsAllThreeVisibleRows()
+    public void CandidateGeneratorKeepsOnlyFirstTwentyCardsInTopTwoRows()
     {
         var candidates = new OpenCvCandidateGenerator().Generate(ThreeRowCardGrid());
 
-        Assert.True(candidates.Count == 12, string.Join(" | ", candidates.Select(candidate =>
+        Assert.True(candidates.Count == 8, string.Join(" | ", candidates.Select(candidate =>
             $"r{candidate.Row}:{candidate.BoundingBox.X1}-{candidate.BoundingBox.X2}")));
+        Assert.Single(candidates, candidate => candidate.IsSource);
+        Assert.True(candidates[0].IsSource);
         Assert.Collection(candidates.Select(candidate => candidate.Row).Distinct().Order(),
-            row => Assert.Equal(0, row), row => Assert.Equal(1, row), row => Assert.Equal(2, row));
+            row => Assert.Equal(0, row), row => Assert.Equal(1, row));
         Assert.All(candidates.GroupBy(candidate => candidate.Row), row => Assert.Equal(4, row.Count()));
+    }
+
+    [Fact]
+    public void ManualCardLookupFindsCardAtClickWithoutCandidatePrefilter()
+    {
+        var renderer = new OpenCvBoxRenderer();
+        var image = FramedCardGrid();
+
+        var card = renderer.FindCardAtPoint(image, 140, 110);
+
+        Assert.NotNull(card);
+        Assert.InRange(card.Value.X1, 108, 112);
+        Assert.InRange(card.Value.X2, 168, 172);
+        Assert.InRange(card.Value.Y1, 38, 42);
+        Assert.InRange(card.Value.Y2, 198, 202);
+        Assert.Null(renderer.FindCardAtPoint(image, 185, 110));
+        Assert.Null(renderer.FindCardAtPoint(ThreeRowCardGrid(), 250, 480));
     }
 
     internal static ImageFrame Gradient(int width, int height)
