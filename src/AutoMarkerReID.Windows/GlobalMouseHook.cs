@@ -10,6 +10,8 @@ public sealed class GlobalMouseHook : IDisposable
     private nint _hook;
     private nint _lastBlaze;
     private nint _lastExcel;
+    private bool _suppressBlazeRightClick;
+    private bool _switchBlazeAndExcel;
 
     public GlobalMouseHook()
     {
@@ -47,10 +49,32 @@ public sealed class GlobalMouseHook : IDisposable
                 var foreground = NativeMethods.GetForegroundWindow();
                 var processName = GetProcessName(foreground);
                 UpdateForegroundCache(foreground, processName);
-                if (wParam.ToInt32() == NativeMethods.WmRButtonUp && _lastBlaze == foreground && !IsTaskbar(data.Point))
+                var message = wParam.ToInt32();
+                if (message == NativeMethods.WmRButtonDown && _lastBlaze == foreground && !IsTaskbar(data.Point))
+                {
+                    _suppressBlazeRightClick = true;
+                    return 1;
+                }
+
+                if (message == NativeMethods.WmRButtonUp && _suppressBlazeRightClick)
+                {
+                    _suppressBlazeRightClick = false;
                     BlazeRightClicked?.Invoke(this, EventArgs.Empty);
-                else if (wParam.ToInt32() == NativeMethods.WmMButtonUp)
+                    return 1;
+                }
+
+                if (message == NativeMethods.WmMButtonDown && IsBlazeOrExcel(processName))
+                {
+                    _switchBlazeAndExcel = true;
+                    return 1;
+                }
+
+                if (message == NativeMethods.WmMButtonUp && _switchBlazeAndExcel)
+                {
+                    _switchBlazeAndExcel = false;
                     ToggleBlazeAndExcel(processName);
+                    return 1;
+                }
             }
         }
         catch (Exception)
@@ -79,6 +103,10 @@ public sealed class GlobalMouseHook : IDisposable
             Activate(_lastBlaze);
         }
     }
+
+    private static bool IsBlazeOrExcel(string? processName) =>
+        processName?.Contains("blaze", StringComparison.OrdinalIgnoreCase) == true ||
+        processName?.Equals("EXCEL", StringComparison.OrdinalIgnoreCase) == true;
 
     private static nint FindWindow(string processName)
     {

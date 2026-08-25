@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string]$Version = '1.0.3',
+    [string]$Version = '1.0.4',
     [string]$CertificateThumbprint,
     [string]$PfxPath,
     [string]$TimestampUrl = 'http://timestamp.digicert.com'

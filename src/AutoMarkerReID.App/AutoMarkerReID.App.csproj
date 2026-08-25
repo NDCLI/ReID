@@ -15,9 +15,9 @@
     <Company>AutoMarker Re-ID</Company>
     <Description>Local Windows application for person re-identification and result review.</Description>
     <Copyright>Copyright © 2026 AutoMarker Re-ID</Copyright>
-    <Version>1.0.3</Version>
-    <FileVersion>1.0.3.0</FileVersion>
-    <AssemblyVersion>1.0.3.0</AssemblyVersion>
+    <Version>1.0.4</Version>
+    <FileVersion>1.0.4.0</FileVersion>
+    <AssemblyVersion>1.0.4.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>

@@ -81,6 +81,16 @@ public sealed class ApplicationController : BackgroundService
     }
 
     public async Task RebuildCacheAsync(IProgress<double>? progress, CancellationToken cancellationToken)
+        => await RunMaintenanceAsync(token => _initializer.RebuildCacheAsync(progress, token), cancellationToken).ConfigureAwait(false);
+
+    public async Task ClearAllDataAsync(Func<CancellationToken, Task> clearData, CancellationToken cancellationToken)
+        => await RunMaintenanceAsync(async token =>
+        {
+            await clearData(token).ConfigureAwait(false);
+            await _initializer.RebuildCacheAsync(null, token).ConfigureAwait(false);
+        }, cancellationToken).ConfigureAwait(false);
+
+    private async Task RunMaintenanceAsync(Func<CancellationToken, Task> maintenance, CancellationToken cancellationToken)
     {
         if (!TryTransition(AppRuntimeState.Monitoring, AppRuntimeState.RebuildingCache))
         {
@@ -90,7 +100,7 @@ public sealed class ApplicationController : BackgroundService
         _clipboardMonitor.SetSuspended(true);
         try
         {
-            await _initializer.RebuildCacheAsync(progress, cancellationToken).ConfigureAwait(false);
+            await maintenance(cancellationToken).ConfigureAwait(false);
         }
         finally
         {

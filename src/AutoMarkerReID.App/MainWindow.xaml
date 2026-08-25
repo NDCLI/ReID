@@ -58,7 +58,7 @@
                         <Button Content="Kết quả đã lưu" ToolTip="Xem và chỉnh sửa các kết quả nhận diện đã lưu" Command="{Binding OpenLibraryCommand}" />
                         <Button Content="Chỉnh sửa ảnh" ToolTip="Mở một ảnh có sẵn để cắt, xóa dải hoặc ghép ảnh" Command="{Binding EditImageCommand}" />
                         <Button Content="Ảnh chụp gần đây" ToolTip="Xem các ảnh đã chụp và mở trình chỉnh sửa" Command="{Binding OpenLatestCaptureCommand}" />
-                        <Button Content="Xóa dữ liệu Query" ToolTip="Xóa ảnh tham chiếu trong phạm vi đang chọn" Command="{Binding DeleteQueryCommand}" />
+                        <Button Content="Xóa toàn bộ dữ liệu" ToolTip="Xóa vĩnh viễn Query, cache AI và toàn bộ output" Command="{Binding DeleteQueryCommand}" />
                         <Button Content="Tạo lại dữ liệu AI" ToolTip="Tạo lại đặc trưng nhận diện và dữ liệu OCR từ ảnh Query" Command="{Binding RebuildCacheCommand}" />
                         <Button Content="Dọn nhật ký" ToolTip="Xóa toàn bộ nội dung nhật ký hoạt động" Command="{Binding ClearLogCommand}" />
                     </UniformGrid>
@@ -66,7 +66,7 @@
                     <TextBlock Text="LƯU ẢNH THAM CHIẾU VÀO" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" Margin="4,0,4,5" />
                     <Grid Margin="4">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                        <TextBox Text="{Binding TargetQuery, UpdateSourceTrigger=PropertyChanged}" Padding="9,7" VerticalContentAlignment="Center"/>
+                        <ComboBox ItemsSource="{Binding TargetQueries}" SelectedItem="{Binding TargetQuery}" Padding="7,5" VerticalContentAlignment="Center"/>
                         <Button Grid.Column="1" Content="Chọn Query trống" ToolTip="Tìm Query chưa có ảnh tham chiếu" Command="{Binding SelectEmptyTargetCommand}" Margin="6,0,0,0"/>
                     </Grid>
                     <CheckBox Content="Hỗ trợ đối chiếu trang phục (LBP)" ToolTip="Dùng đặc điểm trang phục để phân định các kết quả có độ tương đồng gần nhau" IsChecked="{Binding AppearanceEnabled}" />

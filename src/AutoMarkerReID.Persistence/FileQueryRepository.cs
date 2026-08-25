@@ -115,6 +115,14 @@ public sealed partial class FileQueryRepository(
         }
     }
 
+    public Task DeleteAllAsync(CancellationToken cancellationToken)
+    {
+        DeleteDirectoryContents(paths.Queries, cancellationToken);
+        for (var index = 1; index <= 14; index++)
+            Directory.CreateDirectory(Path.Combine(paths.Queries, $"Query_{index}"));
+        return Task.CompletedTask;
+    }
+
     private static float Calibrate(List<ReferenceImage> references)
     {
         var scores = new List<float>();
@@ -159,6 +167,22 @@ public sealed partial class FileQueryRepository(
         int.TryParse(QueryNameRegex().Match(Path.GetFileName(path)).Groups[1].Value, out var number) ? number : int.MaxValue;
 
     private static bool IsSupportedImage(string path) => Path.GetExtension(path).ToLowerInvariant() is ".png" or ".jpg" or ".jpeg" or ".bmp" or ".webp";
+
+    private static void DeleteDirectoryContents(string directory, CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(directory);
+        foreach (var file in Directory.EnumerateFiles(directory))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Delete(file);
+        }
+
+        foreach (var childDirectory in Directory.EnumerateDirectories(directory))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Directory.Delete(childDirectory, recursive: true);
+        }
+    }
 
     [GeneratedRegex("^Query_([1-9][0-9]{0,2})$", RegexOptions.CultureInvariant)]
     private static partial Regex QueryNameRegex();

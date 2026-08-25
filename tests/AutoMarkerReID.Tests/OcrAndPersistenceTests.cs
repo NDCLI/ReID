@@ -58,6 +58,29 @@ public sealed class OcrAndPersistenceTests
         }
     }
 
+    [Fact]
+    public async Task ResultRepositoryDeleteAllPermanentlyClearsEveryOutputFile()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"automarker-clear-results-{Guid.NewGuid():N}");
+        try
+        {
+            var paths = new StoragePaths(root, Path.Combine(root, "models"));
+            paths.EnsureCreated();
+            var repository = new FileResultRepository(paths, new OpenCvImageCodec(), new OpenCvBoxRenderer(), new RecordingTrash());
+            var nested = Path.Combine(paths.Output, "Query_3", "leftover.bin");
+            Directory.CreateDirectory(Path.GetDirectoryName(nested)!);
+            await File.WriteAllBytesAsync(nested, [1, 2, 3]);
+
+            await repository.DeleteAllAsync(CancellationToken.None);
+
+            Assert.Empty(Directory.EnumerateFileSystemEntries(paths.Output, "*", SearchOption.AllDirectories));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
     private static MatchResult Match(BoundingBox box) => new(
         "Query_1", "reference", box, 0.9f, 0.1f, 0.92f, 1f,
         new Dictionary<string, float> { ["osnet"] = 0.9f }, "7:42 AM", MatchSource.Body);

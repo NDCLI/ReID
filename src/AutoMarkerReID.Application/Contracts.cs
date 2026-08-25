@@ -51,6 +51,7 @@ public interface IQueryRepository
     Task<string> EnsureQueryAsync(string queryId, CancellationToken cancellationToken);
     Task<string> AddReferenceAsync(string queryId, ImageFrame image, CancellationToken cancellationToken);
     Task DeleteScopeAsync(string? queryId, CancellationToken cancellationToken);
+    Task DeleteAllAsync(CancellationToken cancellationToken);
 }
 
 public interface IResultRepository
@@ -60,6 +61,7 @@ public interface IResultRepository
     Task<IReadOnlyList<SavedResult>> ListAsync(CancellationToken cancellationToken);
     Task UpdateMatchesAsync(SavedResult result, IReadOnlyList<MatchResult> matches, CancellationToken cancellationToken);
     Task MoveToRecycleBinAsync(SavedResult result, CancellationToken cancellationToken);
+    Task DeleteAllAsync(CancellationToken cancellationToken);
 }
 
 public interface IFeatureCache

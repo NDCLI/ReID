@@ -79,6 +79,32 @@ public sealed class QueryTests
         }
     }
 
+    [Fact]
+    public async Task DeleteAllPermanentlyClearsImagesAndCacheButKeepsQuerySlots()
+    {
+        var root = CreateRoot();
+        try
+        {
+            var paths = new StoragePaths(root, Path.Combine(root, "models"));
+            paths.EnsureCreated();
+            var reference = Path.Combine(paths.Queries, "Query_4", "sample.png");
+            var cache = Path.Combine(paths.Queries, "Query_4", ".cache", "sample.emb");
+            Directory.CreateDirectory(Path.GetDirectoryName(cache)!);
+            await File.WriteAllBytesAsync(reference, [1, 2, 3]);
+            await File.WriteAllBytesAsync(cache, [4, 5, 6]);
+            var repository = new FileQueryRepository(paths, new OpenCvImageCodec(), new FileFeatureCache(paths));
+
+            await repository.DeleteAllAsync(CancellationToken.None);
+
+            Assert.Empty(Directory.EnumerateFiles(paths.Queries, "*", SearchOption.AllDirectories));
+            Assert.All(Enumerable.Range(1, 14), index => Assert.True(Directory.Exists(Path.Combine(paths.Queries, $"Query_{index}"))));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
     private static string CreateRoot()
     {
         var path = Path.Combine(Path.GetTempPath(), $"automarker-queries-{Guid.NewGuid():N}");

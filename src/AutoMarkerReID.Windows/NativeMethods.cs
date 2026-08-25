@@ -11,7 +11,9 @@ internal static partial class NativeMethods
     internal const uint Srccopy = 0x00CC0020;
     internal const int WmHotkey = 0x0312;
     internal const int WhMouseLl = 14;
+    internal const int WmRButtonDown = 0x0204;
     internal const int WmRButtonUp = 0x0205;
+    internal const int WmMButtonDown = 0x0207;
     internal const int WmMButtonUp = 0x0208;
     internal const int SwRestore = 9;
 

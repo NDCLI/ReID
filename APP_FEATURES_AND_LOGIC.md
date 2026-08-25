@@ -64,7 +64,7 @@ flowchart TD
 | Làm mới OCR | Làm mới danh sách Query, hỏi xác nhận rồi xóa/rebuild toàn bộ cache feature và OCR trên thread nền |
 | Thư viện | Mở thư viện kết quả trong `output/` |
 | Xóa log | Xóa cả log đang hiển thị và log còn chờ trong queue |
-| Xóa Query | Xóa ảnh trong Query/phạm vi đang chọn, xóa cache tương ứng **và xóa toàn bộ kết quả trong `output/`** |
+| Xóa toàn bộ dữ liệu | Xóa vĩnh viễn toàn bộ ảnh Query, cache AI và toàn bộ kết quả trong `output/` sau khi xác nhận |
 | Chụp vùng | Mở overlay chọn một vùng mới |
 | Chụp lại | Chụp lại vùng gần nhất mà không mở overlay |
 | Lưu ảnh | Bật/tắt việc lưu ảnh chụp vùng vào thư mục Screenshots của Windows |
@@ -210,7 +210,7 @@ Nút **Ảnh chụp** mở thư viện riêng: danh sách ảnh trong `Pictures\
 - Cache chỉ được dùng nếu `mtime(cache) >= mtime(ảnh)`; cache hỏng, cũ hoặc thiếu sẽ được tính lại.
 - App dọn cache mồ côi khi ảnh nguồn đã bị xóa hoặc chuyển đi.
 - **Làm mới OCR** xóa tất cả `.cache`, sau đó trích xuất feature và OCR lại từ đầu trên thread nền. Ảnh Query không bị xóa.
-- **Xóa Query** xóa ảnh ở phạm vi Query đang chọn, xóa cache của phạm vi đó và xóa toàn bộ `output/` sau khi xác nhận.
+- **Xóa toàn bộ dữ liệu** xóa vĩnh viễn ảnh ở mọi Query, toàn bộ cache và toàn bộ `output/` sau khi xác nhận.
 
 ### 3.12. Chế độ CLI độc lập
 
@@ -477,7 +477,7 @@ Các hành vi sau là logic của ứng dụng hiện tại và cần được g
 8. Kết quả tự động cap theo `reference_count - 1`; khung thêm thủ công không bị cap.
 9. Chỉ giữ một Query chiếm ưu thế trên mỗi screenshot.
 10. Review phải mở kể cả khi matcher trả về 0 khung.
-11. Nút **Xóa Query** hiện xóa cả output; nếu bản mới đổi hành vi này thì phải coi đó là thay đổi nghiệp vụ có chủ đích.
+11. Nút **Xóa toàn bộ dữ liệu** xóa vĩnh viễn cả Query, cache và output sau xác nhận.
 12. Xóa trong Thư viện phải là thao tác có thể khôi phục tương đương Recycle Bin.
 
 Những khả năng có trong mã hỗ trợ nhưng không thuộc yêu cầu tương thích của app hiện tại:

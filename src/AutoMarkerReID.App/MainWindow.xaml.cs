@@ -328,24 +328,23 @@ public partial class MainWindow : Window, IDisposable
 
     private async Task DeleteSelectedQueryAsync()
     {
-        var scope = _viewModel.SelectedQuery?.Id;
-        var label = scope ?? "toàn bộ Query";
         var answer = DarkMessageBox.Show(this,
-            $"Xóa ảnh trong {label}, dữ liệu AI tương ứng và chuyển toàn bộ kết quả đã lưu vào Thùng rác?",
-            "Xóa dữ liệu Query", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+            "Xóa vĩnh viễn toàn bộ ảnh Query, cache AI và tất cả kết quả trong output? Dữ liệu này không thể khôi phục.",
+            "Xóa toàn bộ dữ liệu", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;
         try
         {
-            await _queryRepository.DeleteScopeAsync(scope, CancellationToken.None);
-            foreach (var result in await _resultRepository.ListAsync(CancellationToken.None))
-                await _resultRepository.MoveToRecycleBinAsync(result, CancellationToken.None);
-            await _controller.RebuildCacheAsync(null, CancellationToken.None);
+            await _controller.ClearAllDataAsync(async cancellationToken =>
+            {
+                await _queryRepository.DeleteAllAsync(cancellationToken);
+                await _resultRepository.DeleteAllAsync(cancellationToken);
+            }, CancellationToken.None);
             _viewModel.RefreshQueries();
-            ShowOsd($"Đã chuyển {label} vào Thùng rác");
+            ShowOsd("Đã xóa toàn bộ Query, cache và output");
         }
         catch (Exception exception)
         {
-            DarkMessageBox.Show(this, exception.Message, "Xóa dữ liệu Query", MessageBoxButton.OK, MessageBoxImage.Error);
+            DarkMessageBox.Show(this, exception.Message, "Xóa toàn bộ dữ liệu", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

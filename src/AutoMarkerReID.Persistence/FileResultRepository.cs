@@ -133,6 +133,24 @@ public sealed class FileResultRepository(
         return trashService.MoveToRecycleBinAsync(files, cancellationToken);
     }
 
+    public Task DeleteAllAsync(CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(paths.Output);
+        foreach (var file in Directory.EnumerateFiles(paths.Output))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Delete(file);
+        }
+
+        foreach (var directory in Directory.EnumerateDirectories(paths.Output))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Directory.Delete(directory, recursive: true);
+        }
+
+        return Task.CompletedTask;
+    }
+
     private static async Task WriteDurableAsync(string path, byte[] contents, CancellationToken cancellationToken)
     {
         await using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous);
