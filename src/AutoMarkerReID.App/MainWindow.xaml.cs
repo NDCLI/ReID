@@ -231,7 +231,16 @@ public partial class MainWindow : Window, IDisposable
             ShowOsd(best is null ? "Không có kết quả đạt ngưỡng" : $"{best.QueryId} · {best.Score:P0}");
             foreach (var diagnostic in ReviewWindow.BuildDiagnostics(args.Session))
                 LogReviewDiagnostic(_logger, diagnostic, null);
-            var review = new ReviewWindow(args.Session, _candidateGenerator, _selection, _codec, _boxRenderer) { Owner = IsVisible ? this : null };
+            var review = new ReviewWindow(args.Session, _candidateGenerator, _selection, _codec, _boxRenderer)
+            {
+                Owner = IsVisible ? this : null,
+                WindowState = WindowState.Normal,
+                ShowActivated = true,
+                // The main window is normally hidden in the tray. Keep Review in front
+                // until it closes so the result is immediately actionable.
+                Topmost = true,
+            };
+            review.Loaded += (_, _) => review.Activate();
             review.ShowDialog();
             args.Complete(review.Outcome ?? new ReviewOutcome(ReviewDecision.Cancel));
         });
