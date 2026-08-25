@@ -39,6 +39,9 @@ public partial class App : System.Windows.Application
             .ConfigureServices(services => ConfigureServices(services, paths))
             .Build();
 
+        var preferences = _host.Services.GetRequiredService<UserPreferencesStore>().Load();
+        LocalizationService.Configure(preferences.Language);
+
         await _host.StartAsync().ConfigureAwait(true);
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         MainWindow = mainWindow;

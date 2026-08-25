@@ -48,8 +48,10 @@ public partial class ReviewWindow : Window
 
         var card = _boxRenderer.FindCardAtPoint(_session.Original, (int)Math.Round(point.X), (int)Math.Round(point.Y));
         if (card is null) return;
-        var queryId = _matches.GroupBy(match => match.QueryId).OrderByDescending(group => group.Count()).Select(group => group.Key).FirstOrDefault()
-                      ?? _selection.RecognitionScope ?? _selection.TargetQuery;
+        // Manual boxes belong to the explicitly selected recognition scope. If
+        // recognition is intentionally set to "Tất cả Query", use the target
+        // Query for saving instead of inheriting an unrelated dominant result.
+        var queryId = _selection.RecognitionScope ?? _selection.TargetQuery;
         _matches.Add(new MatchResult(queryId, null, card.Value, 1, null, null, 1,
             new Dictionary<string, float>(), null, MatchSource.Manual, true));
         ApplyBoxSpacing();

@@ -166,6 +166,7 @@ public sealed class ApplicationController : BackgroundService
             _clipboardMonitor.SetSuspended(true);
             try
             {
+                ApplicationControllerLog.RecognitionScope(_logger, _selection.RecognitionScope ?? "Tất cả Query", _selection.TargetQuery);
                 var result = await _processor.ProcessAsync(job, cancellationToken).ConfigureAwait(false);
                 await HandleResultAsync(job, result, cancellationToken).ConfigureAwait(false);
             }
@@ -265,6 +266,9 @@ public sealed class ApplicationController : BackgroundService
 
 internal static partial class ApplicationControllerLog
 {
+    [LoggerMessage(EventId = 1010, Level = LogLevel.Information, Message = "Bắt đầu xử lý ảnh: phạm vi nhận diện={RecognitionScope}; Query lưu ảnh={TargetQuery}.")]
+    public static partial void RecognitionScope(ILogger logger, string recognitionScope, string targetQuery);
+
     [LoggerMessage(EventId = 1000, Level = LogLevel.Critical, Message = "Hệ thống nhận diện không thể khởi động hoặc tiến trình xử lý đã dừng.")]
     public static partial void EngineStopped(ILogger logger, Exception exception);
 

@@ -18,22 +18,25 @@ public partial class ImageEditorWindow : Window
 {
     private readonly IImageCodec _codec;
     private readonly ImageFrame _original;
+    private readonly string? _sourcePath;
     private readonly Stack<ImageFrame> _undo = [];
     private ImageFrame _current;
     private WpfPoint? _dragStart;
     private WpfPoint _lastDragPos;
 
-    public ImageEditorWindow(ImageFrame image, IImageCodec codec)
+    public ImageEditorWindow(ImageFrame image, IImageCodec codec, string? sourcePath = null)
     {
         _original = image;
         _current = image;
         _codec = codec;
+        _sourcePath = sourcePath;
         InitializeComponent();
         WindowsDarkMode.Apply(this);
         RefreshImage();
     }
 
     public ImageFrame? Result { get; private set; }
+    public string? SavedPath { get; private set; }
 
     private void OnMouseDown(object sender, MouseButtonEventArgs e)
     {
@@ -126,7 +129,29 @@ public partial class ImageEditorWindow : Window
         }
     }
 
-    private void OnSave(object sender, RoutedEventArgs e) { Result = _current; DialogResult = true; }
+    private void OnSave(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(_sourcePath))
+            {
+                var directory = Path.GetDirectoryName(_sourcePath)!;
+                var stem = Path.GetFileNameWithoutExtension(_sourcePath);
+                var path = Path.Combine(directory, $"{stem}_edited.png");
+                var suffix = 2;
+                while (File.Exists(path)) path = Path.Combine(directory, $"{stem}_edited_{suffix++}.png");
+                File.WriteAllBytes(path, _codec.EncodePng(_current));
+                SavedPath = path;
+            }
+
+            Result = _current;
+            DialogResult = true;
+        }
+        catch (Exception exception)
+        {
+            DarkMessageBox.Show(this, exception.Message, "Chỉnh sửa ảnh", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
     private void OnCancel(object sender, RoutedEventArgs e) { Result = null; DialogResult = false; }
 
     private void OnKeyDown(object sender, WpfKeyEventArgs e)

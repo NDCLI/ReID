@@ -31,6 +31,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly IBoxRenderer _boxRenderer;
     private readonly IQueryRepository _queryRepository;
     private readonly ILogger<MainWindow> _logger;
+    private readonly UserPreferencesStore _preferences;
     private readonly Forms.NotifyIcon _trayIcon;
     private System.Drawing.Icon _trayDrawingIcon;
     private readonly Forms.ContextMenuStrip _trayMenu;
@@ -40,6 +41,8 @@ public partial class MainWindow : Window, IDisposable
     private BoundingBox? _lastCaptureRegion;
     private ImageFrame? _latestCapture;
     private bool _allowClose;
+    private static Window? _activeOsd;
+    private static System.Windows.Threading.DispatcherTimer? _activeOsdTimer;
 
     public MainWindow(
         MainViewModel viewModel,
@@ -54,7 +57,8 @@ public partial class MainWindow : Window, IDisposable
         IResultRepository resultRepository,
         IBoxRenderer boxRenderer,
         IQueryRepository queryRepository,
-        ILogger<MainWindow> logger)
+        ILogger<MainWindow> logger,
+        UserPreferencesStore preferences)
     {
         _controller = controller;
         _captureService = captureService;
@@ -69,6 +73,7 @@ public partial class MainWindow : Window, IDisposable
         _boxRenderer = boxRenderer;
         _queryRepository = queryRepository;
         _logger = logger;
+        _preferences = preferences;
         InitializeComponent();
         WindowsDarkMode.Apply(this);
         DataContext = viewModel;
@@ -131,6 +136,10 @@ public partial class MainWindow : Window, IDisposable
             queryMenu.DropDownItems.Add($"Query_{index}", null, (_, _) => Dispatcher.Invoke(() => _viewModel.SelectQueryPosition(position)));
         }
         menu.Items.Add(queryMenu);
+        var languageMenu = new Forms.ToolStripMenuItem("Ngôn ngữ / Language");
+        languageMenu.DropDownItems.Add("Tiếng Việt", null, (_, _) => SetLanguage("vi-VN"));
+        languageMenu.DropDownItems.Add("English", null, (_, _) => SetLanguage("en-US"));
+        menu.Items.Add(languageMenu);
         var lbpItem = new Forms.ToolStripMenuItem("Hỗ trợ đối chiếu trang phục (LBP)") { CheckOnClick = true };
         lbpItem.CheckedChanged += (_, _) => Dispatcher.Invoke(() => _viewModel.AppearanceEnabled = lbpItem.Checked);
         menu.Items.Add(lbpItem);
@@ -318,7 +327,7 @@ public partial class MainWindow : Window, IDisposable
         try
         {
             var image = _codec.Decode(File.ReadAllBytes(dialog.FileName));
-            OpenStandaloneEditor(image, Path.GetFileNameWithoutExtension(dialog.FileName) + "_edited.png");
+            OpenStandaloneEditor(image, dialog.FileName);
         }
         catch (Exception exception)
         {
@@ -335,12 +344,11 @@ public partial class MainWindow : Window, IDisposable
         window.ShowDialog();
     }
 
-    private void OpenStandaloneEditor(ImageFrame image, string suggestedName)
+    private void OpenStandaloneEditor(ImageFrame image, string sourcePath)
     {
-        var editor = new ImageEditorWindow(image, _codec) { Owner = this };
+        var editor = new ImageEditorWindow(image, _codec, sourcePath) { Owner = this };
         if (editor.ShowDialog() != true || editor.Result is not { } edited) return;
-        var save = new Microsoft.Win32.SaveFileDialog { Filter = "PNG|*.png", FileName = suggestedName, DefaultExt = ".png" };
-        if (save.ShowDialog(this) == true) File.WriteAllBytes(save.FileName, _codec.EncodePng(edited));
+        ShowOsd(editor.SavedPath is null ? "Đã cập nhật ảnh" : $"Đã lưu {Path.GetFileName(editor.SavedPath)}");
     }
 
     private async Task DeleteSelectedQueryAsync()
@@ -443,33 +451,60 @@ public partial class MainWindow : Window, IDisposable
 
     private static void ShowOsd(string message)
     {
+        _activeOsdTimer?.Stop();
+        _activeOsd?.Close();
+
         var osd = new Window
         {
-            Width = 340,
-            Height = 70,
+            Width = 460,
+            Height = 48,
             WindowStyle = WindowStyle.None,
             AllowsTransparency = true,
             Background = System.Windows.Media.Brushes.Transparent,
             Topmost = true,
             ShowInTaskbar = false,
-            WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            WindowStartupLocation = WindowStartupLocation.Manual,
             Content = new System.Windows.Controls.Border
             {
-                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 17, 24, 39)),
-                CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(18),
+                Background = System.Windows.Media.Brushes.Transparent,
+                Padding = new Thickness(2),
                 Child = new System.Windows.Controls.TextBlock
                 {
                     Text = message,
-                    Foreground = System.Windows.Media.Brushes.White,
-                    FontSize = 18,
+                    Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(186, 230, 253)),
+                    FontSize = 16,
+                    FontWeight = FontWeights.SemiBold,
                     HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                    VerticalAlignment = System.Windows.VerticalAlignment.Center,
+                    TextAlignment = System.Windows.TextAlignment.Center,
+                    TextWrapping = System.Windows.TextWrapping.NoWrap,
+                    Effect = new System.Windows.Media.Effects.DropShadowEffect
+                    {
+                        Color = System.Windows.Media.Colors.Black,
+                        Direction = 270,
+                        ShadowDepth = 2,
+                        BlurRadius = 5,
+                        Opacity = 0.95,
+                    },
                 },
             },
         };
+        osd.Left = (SystemParameters.PrimaryScreenWidth - osd.Width) / 2;
+        osd.Top = 72;
+        _activeOsd = osd;
         osd.Show();
         var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        timer.Tick += (_, _) => { timer.Stop(); osd.Close(); };
+        _activeOsdTimer = timer;
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            if (ReferenceEquals(_activeOsd, osd))
+            {
+                _activeOsd = null;
+                _activeOsdTimer = null;
+            }
+            osd.Close();
+        };
         timer.Start();
     }
 
@@ -485,6 +520,12 @@ public partial class MainWindow : Window, IDisposable
         if (Environment.ProcessPath is { } executable)
             Process.Start(new ProcessStartInfo(executable) { UseShellExecute = true });
         ExitApplication();
+    }
+
+    private void SetLanguage(string language)
+    {
+        _preferences.SaveLanguage(language);
+        Restart();
     }
 
     private void ExitApplication()

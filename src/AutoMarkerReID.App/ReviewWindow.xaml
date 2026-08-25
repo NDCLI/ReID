@@ -19,7 +19,6 @@
             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
             <TextBlock x:Name="SummaryText" VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" />
             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button Content="CẮT / CHỈNH SỬA" Click="OnEditClick" />
                 <Button Content="HỦY" Click="OnCancelClick" />
                 <Button Content="LƯU VÀ SAO CHÉP" Background="#0284C7" Click="OnSaveClick" />
             </StackPanel>

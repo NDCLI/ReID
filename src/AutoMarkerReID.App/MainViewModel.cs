@@ -57,6 +57,8 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _appearanceEnabled;
     [ObservableProperty] private bool _saveCaptures = true;
     [ObservableProperty] private string _hotkeyStatus = "Phím tắt chưa đăng ký";
+    [ObservableProperty] private string _recognitionScopeText = LocalizationService.IsEnglish ? "Recognition scope: All Queries" : "Phạm vi nhận diện: Tất cả Query";
+    [ObservableProperty] private string _targetQueryText = LocalizationService.IsEnglish ? "Reference Query: Query_1" : "Query lưu tham chiếu: Query_1";
     [ObservableProperty] private string _clipboardSummary = "Đã tiếp nhận: 0 · Đã bỏ qua: 0";
     [ObservableProperty] private string _startupHealthText = "Đang kiểm tra mô hình nhận diện, OCR và dữ liệu Query…";
     [ObservableProperty] private string _startupIssueText = string.Empty;
@@ -75,11 +77,15 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnSelectedQueryChanged(QueryListItem? value)
     {
         _selection.RecognitionScope = value?.Id;
+        RecognitionScopeText = LocalizationService.IsEnglish
+            ? $"Recognition scope: {LocalizationService.Translate(value?.DisplayName ?? "Tất cả Query")}"
+            : $"Phạm vi nhận diện: {value?.DisplayName ?? "Tất cả Query"}";
         SavePreferences();
     }
 
     partial void OnTargetQueryChanged(string value)
     {
+        TargetQueryText = LocalizationService.IsEnglish ? $"Reference Query: {value}" : $"Query lưu tham chiếu: {value}";
         if (value.StartsWith("Query_", StringComparison.OrdinalIgnoreCase) &&
             int.TryParse(value.AsSpan("Query_".Length), out var number) && number is >= 1 and <= 999)
         {
@@ -143,6 +149,9 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var id in Queries.Where(query => query.Id is not null).Select(query => query.Id!)) TargetQueries.Add(id);
 
         SelectedQuery = Queries.FirstOrDefault(query => query.Id == selectedId) ?? Queries[0];
+        RecognitionScopeText = LocalizationService.IsEnglish
+            ? $"Recognition scope: {LocalizationService.Translate(SelectedQuery.DisplayName)}"
+            : $"Phạm vi nhận diện: {SelectedQuery.DisplayName}";
         _restoredRecognitionScope = null;
         RefreshStartupHealth();
     }
@@ -156,7 +165,6 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var empty = Queries.Skip(1).FirstOrDefault(query => query.ReferenceCount == 0);
         if (empty is null) return;
-        SelectedQuery = empty;
         TargetQuery = empty.Id!;
         SelectionFeedback?.Invoke(this, $"Đã chọn {empty.Id}");
     }
@@ -179,7 +187,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
-            StatusText = e.State switch
+            StatusText = LocalizationService.Translate(e.State switch
             {
                 AppRuntimeState.Starting => "Đang nạp mô hình nhận diện và dữ liệu Query…",
                 AppRuntimeState.Monitoring => "Đang theo dõi Clipboard",
@@ -190,7 +198,7 @@ public sealed partial class MainViewModel : ObservableObject
                 AppRuntimeState.Error => e.Error ?? "Hệ thống nhận diện gặp lỗi",
                 AppRuntimeState.ShuttingDown => "Đang thoát…",
                 _ => e.State.ToString(),
-            };
+            });
             StatusColor = e.State switch
             {
                 AppRuntimeState.Monitoring => "#22C55E",
@@ -258,10 +266,14 @@ public sealed partial class MainViewModel : ObservableObject
 
 public sealed record QueryListItem(string DisplayName, string? Id, int ReferenceCount)
 {
-    public string Summary => $"{DisplayName} · {ReferenceCount} ảnh";
+    public string Summary => LocalizationService.IsEnglish ? $"{DisplayName} · {ReferenceCount} images" : $"{DisplayName} · {ReferenceCount} ảnh";
     public bool IsWeak => Id is not null && ReferenceCount <= 1;
     public string Foreground => IsWeak ? "#F59E0B" : "#E5E7EB";
     public string ToolTip => IsWeak
-        ? $"{DisplayName} mới có {ReferenceCount} ảnh. Nên thêm ảnh khác góc, ánh sáng hoặc trang phục."
-        : $"{DisplayName} có {ReferenceCount} ảnh tham chiếu.";
+        ? LocalizationService.IsEnglish
+            ? $"{DisplayName} has only {ReferenceCount} image(s). Add different angles, lighting or clothing."
+            : $"{DisplayName} mới có {ReferenceCount} ảnh. Nên thêm ảnh khác góc, ánh sáng hoặc trang phục."
+        : LocalizationService.IsEnglish
+            ? $"{DisplayName} has {ReferenceCount} reference image(s)."
+            : $"{DisplayName} có {ReferenceCount} ảnh tham chiếu.";
 }

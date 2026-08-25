@@ -53,7 +53,19 @@ public sealed class UserPreferencesStore(StoragePaths paths)
             selection.RecognitionScope,
             selection.TargetQuery,
             selection.AppearanceEnabled,
-            selection.SaveCaptures);
+            selection.SaveCaptures,
+            Load().Language);
+        SaveValue(value);
+    }
+
+    public void SaveLanguage(string language)
+    {
+        var current = Load();
+        SaveValue(current with { Language = language });
+    }
+
+    private void SaveValue(UserPreferences value)
+    {
         var bytes = JsonSerializer.SerializeToUtf8Bytes(value, JsonOptions);
         var temporary = _path + ".tmp";
         lock (_sync)
@@ -69,4 +81,5 @@ public sealed record UserPreferences(
     string? RecognitionScope = null,
     string TargetQuery = "Query_1",
     bool AppearanceEnabled = false,
-    bool SaveCaptures = true);
+    bool SaveCaptures = true,
+    string Language = "vi-VN");

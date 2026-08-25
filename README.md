@@ -2,11 +2,11 @@
 
 Ứng dụng Windows chạy cục bộ để lưu ảnh tham chiếu theo Query, nhận diện Re-ID trên ảnh chụp, review kết quả và quản lý thư viện ảnh. Ứng dụng viết bằng C#/.NET 10, WPF, OpenCV và OpenVINO; không cần Python hoặc dịch vụ cloud khi chạy.
 
-**Bản mới nhất:** [v1.0.7](https://github.com/NDCLI/ReID/releases/tag/v1.0.7)
+**Bản mới nhất:** [v1.0.8](https://github.com/NDCLI/ReID/releases/tag/v1.0.8)
 
 ## Cài đặt nhanh
 
-1. Tải `AutoMarkerReID-Setup-1.0.7-win-x64.exe` từ [Release](https://github.com/NDCLI/ReID/releases/latest).
+1. Tải `AutoMarkerReID-Setup-1.0.8-win-x64.exe` từ [Release](https://github.com/NDCLI/ReID/releases/latest).
 2. Chạy Setup và giữ lựa chọn **Khởi động AutoMarker Re-ID cùng Windows** nếu muốn app tự chạy nền sau khi đăng nhập.
 3. Mở app từ Start Menu hoặc shortcut. App có thể khởi động ẩn ở System Tray; dùng menu tray để hiện cửa sổ chính hoặc thoát hoàn toàn.
 
@@ -67,7 +67,7 @@ Tạo Setup self-contained:
 
 ```powershell
 $env:Path = 'C:\Program Files\dotnet;' + $env:Path
-.\installer\Build-Setup.ps1 -Version 1.0.7
+.\installer\Build-Setup.ps1 -Version 1.0.8
 ```
 
 File tạo ra nằm tại `artifacts\setup\AutoMarkerReID-Setup-<version>-win-x64.exe`. Có thể truyền `-CertificateThumbprint` hoặc `-PfxPath` để ký Authenticode khi phát hành.

@@ -88,22 +88,19 @@ public partial class CaptureLibraryWindow : Window
     private async void OnEdit(object sender, RoutedEventArgs e)
     {
         if (_currentImage is null || CaptureList.SelectedItem is not CaptureListItem item) return;
-        var editor = new ImageEditorWindow(_currentImage, _codec) { Owner = this };
+        var editor = new ImageEditorWindow(_currentImage, _codec, item.Path) { Owner = this };
         if (editor.ShowDialog() != true || editor.Result is not { } edited) return;
 
-        Directory.CreateDirectory(_captureDirectory);
-        var baseName = item.Path is null ? $"ReID_{DateTime.Now:yyyyMMdd_HHmmss}" : Path.GetFileNameWithoutExtension(item.Path);
-        var dialog = new Microsoft.Win32.SaveFileDialog
+        if (editor.SavedPath is { } savedPath)
         {
-            Filter = "PNG|*.png",
-            DefaultExt = ".png",
-            AddExtension = true,
-            InitialDirectory = _captureDirectory,
-            FileName = baseName + "_edited.png",
-        };
-        if (dialog.ShowDialog(this) != true) return;
-        await File.WriteAllBytesAsync(dialog.FileName, _codec.EncodePng(edited));
-        await RefreshAsync(dialog.FileName);
+            await RefreshAsync(savedPath);
+            return;
+        }
+
+        Directory.CreateDirectory(_captureDirectory);
+        var fallbackPath = Path.Combine(_captureDirectory, $"ReID_{DateTime.Now:yyyyMMdd_HHmmss}_edited.png");
+        await File.WriteAllBytesAsync(fallbackPath, _codec.EncodePng(edited));
+        await RefreshAsync(fallbackPath);
     }
 
     private async void OnRefresh(object sender, RoutedEventArgs e) => await RefreshAsync();

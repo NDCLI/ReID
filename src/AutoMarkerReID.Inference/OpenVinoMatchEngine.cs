@@ -48,7 +48,6 @@ public sealed class OpenVinoMatchEngine(
         }
 
         var source = candidates.FirstOrDefault(candidate => candidate.IsSource);
-
         var accepted = new List<MatchResult>();
         foreach (var candidate in candidates.Where(candidate => !candidate.IsSource))
         {
