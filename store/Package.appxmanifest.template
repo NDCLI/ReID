@@ -10,7 +10,7 @@
   <Identity Name="{{IDENTITY_NAME}}" Publisher="{{PUBLISHER}}" Version="{{VERSION}}" ProcessorArchitecture="x64" />
 
   <Properties>
-    <DisplayName>AutoMarker Re-ID</DisplayName>
+    <DisplayName>AutoMarkerReID</DisplayName>
     <PublisherDisplayName>{{PUBLISHER_DISPLAY_NAME}}</PublisherDisplayName>
     <Description>Local person re-identification, screenshot review, and reference image management.</Description>
     <Logo>Assets\StoreLogo.png</Logo>
@@ -31,7 +31,7 @@
                  uap10:RuntimeBehavior="packagedClassicApp"
                  uap10:TrustLevel="mediumIL">
       <uap:VisualElements
-        DisplayName="AutoMarker Re-ID"
+        DisplayName="AutoMarkerReID"
         Description="Local person re-identification and screenshot review"
         BackgroundColor="#111827"
         Square44x44Logo="Assets\Square44x44Logo.png"
@@ -46,7 +46,7 @@
           Executable="AutoMarkerReID.App.exe"
           EntryPoint="Windows.FullTrustApplication"
           uap10:Parameters="--startup">
-          <desktop:StartupTask TaskId="AutoMarkerReIDStartup" Enabled="false" DisplayName="AutoMarker Re-ID" />
+          <desktop:StartupTask TaskId="AutoMarkerReIDStartup" Enabled="false" DisplayName="AutoMarkerReID" />
         </desktop:Extension>
       </Extensions>
     </Application>

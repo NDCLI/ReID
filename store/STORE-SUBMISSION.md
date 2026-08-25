@@ -3,7 +3,7 @@
 ## Cần lấy từ Partner Center
 
 1. Tạo tài khoản developer và xác minh danh tính.
-2. Reserve tên **AutoMarker Re-ID**.
+2. Reserve tên **AutoMarkerReID**.
 3. Vào **Product identity**, sao chép chính xác hai giá trị `Package/Identity/Name` và `Package/Identity/Publisher`.
 4. Build gói chính thức:
 
@@ -13,7 +13,7 @@ $env:Path = 'C:\Program Files\dotnet;' + $env:Path
   -Version 1.0.7.0
 ```
 
-Script đã lưu Product identity chính thức `Hoakim.AutoMarkerReID`, publisher `CN=06970FBE-6DFA-4FD9-BB5F-DCC0D8D933FB` và PublisherDisplayName `Hoakim`.
+Script đã lưu Product identity chính thức `Hoakim.AutoMarkerReID`, publisher `CN=06970FBF-6DEA-4FD9-BB5E-DCC0D8D933EB` và PublisherDisplayName `Hoakim`.
 
 Không upload gói được tạo bằng `-TestIdentity`.
 

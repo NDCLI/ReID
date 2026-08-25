@@ -3,7 +3,7 @@ param(
     [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')]
     [string]$Version = '1.0.7.0',
     [string]$IdentityName = 'Hoakim.AutoMarkerReID',
-    [string]$Publisher = 'CN=06970FBE-6DFA-4FD9-BB5F-DCC0D8D933FB',
+    [string]$Publisher = 'CN=06970FBF-6DEA-4FD9-BB5E-DCC0D8D933EB',
     [string]$PublisherDisplayName = 'Hoakim',
     [switch]$TestIdentity
 )
@@ -69,6 +69,19 @@ try {
     [IO.File]::WriteAllText($manifestPath, $manifest, [Text.UTF8Encoding]::new($false))
 
     $semanticVersion = ($Version -split '\.')[0..2] -join '.'
+    $cleanArguments = @(
+        'clean', $projectPath,
+        '--configuration', 'Release',
+        '-p:Platform=x64',
+        '--runtime', 'win-x64',
+        '-p:StoreBuild=true',
+        "-p:StoreManifestPath=$manifestPath",
+        "-p:StoreAssetsPath=$assetsPath",
+        "-p:AppxPackageDir=$outputDirectory\"
+    )
+    & dotnet @cleanArguments
+    if ($LASTEXITCODE -ne 0) { throw 'Store MSIX clean failed.' }
+
     $arguments = @(
         'publish', $projectPath,
         '--configuration', 'Release',
