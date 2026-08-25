@@ -388,11 +388,11 @@ JSON được ghi vào file `.tmp`, `flush` + `fsync`, rồi `os.replace` để 
 
 | Phím/thao tác | Chức năng | Ghi chú |
 | --- | --- | --- |
-| `Ctrl+Shift+A` | Query trước | Có quay vòng |
-| `Ctrl+Shift+D` | Query tiếp theo | Có quay vòng |
-| `Ctrl+Shift+Q` | Chọn Root/Tất cả |  |
+| `F4` | Query trước | Có quay vòng |
+| `F5` | Query tiếp theo | Có quay vòng |
+| `F3` | Chọn Root/Tất cả |  |
 | `Ctrl+Shift+1..9` | Chọn Query theo vị trí | Chỉ chọn nếu vị trí tồn tại |
-| `Ctrl+Shift+N` | Chọn Query trống | Chỉ thực thi khi foreground là Blaze hoặc Excel |
+| `F2` | Chọn Query trống | Chỉ thực thi khi foreground là Blaze hoặc Excel |
 | `Alt+PrintScreen` | Chọn vùng chụp mới | Nếu bị chiếm, thử `Ctrl+Alt+PrintScreen`, sau đó `Ctrl+Alt+Shift+R` |
 | `Alt+S` | Chụp lại vùng gần nhất |  |
 | `Ctrl+Alt+Shift+F10` | Trigger capture từ tích hợp Blaze/AHK | Dự phòng cho mouse hook |

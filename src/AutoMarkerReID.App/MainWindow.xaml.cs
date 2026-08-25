@@ -352,10 +352,10 @@ public partial class MainWindow : Window, IDisposable
     {
         _hotkeys.Attach(this);
         _hotkeys.Pressed += OnHotkeyPressed;
-        Register("PreviousQuery", HotkeyModifiers.Control | HotkeyModifiers.Shift, Key.A);
-        Register("NextQuery", HotkeyModifiers.Control | HotkeyModifiers.Shift, Key.D);
-        Register("RootQuery", HotkeyModifiers.Control | HotkeyModifiers.Shift, Key.Q);
-        Register("EmptyQuery", HotkeyModifiers.Control | HotkeyModifiers.Shift, Key.N);
+        Register("PreviousQuery", HotkeyModifiers.None, Key.F4);
+        Register("NextQuery", HotkeyModifiers.None, Key.F5);
+        Register("RootQuery", HotkeyModifiers.None, Key.F3);
+        Register("EmptyQuery", HotkeyModifiers.None, Key.F2);
         for (var index = 1; index <= 9; index++)
             Register($"Query{index}", HotkeyModifiers.Control | HotkeyModifiers.Shift, (Key)((int)Key.D0 + index));
         Register("RepeatCapture", HotkeyModifiers.Alt, Key.S);
