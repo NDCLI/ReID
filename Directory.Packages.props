@@ -12,6 +12,8 @@
     <PackageVersion Include="JYPPX.OpenVINO.CSharp.API" Version="3.3.1" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="Microsoft.Windows.SDK.BuildTools.MSIX" Version="1.7.260610101" />
+    <PackageVersion Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap10 desktop rescap">
+
+  <Identity Name="{{IDENTITY_NAME}}" Publisher="{{PUBLISHER}}" Version="{{VERSION}}" ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>AutoMarker Re-ID</DisplayName>
+    <PublisherDisplayName>{{PUBLISHER_DISPLAY_NAME}}</PublisherDisplayName>
+    <Description>Local person re-identification, screenshot review, and reference image management.</Description>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Resources>
+    <Resource Language="vi-vn" />
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Applications>
+    <Application Id="App"
+                 Executable="AutoMarkerReID.App.exe"
+                 uap10:RuntimeBehavior="packagedClassicApp"
+                 uap10:TrustLevel="mediumIL">
+      <uap:VisualElements
+        DisplayName="AutoMarker Re-ID"
+        Description="Local person re-identification and screenshot review"
+        BackgroundColor="#111827"
+        Square44x44Logo="Assets\Square44x44Logo.png"
+        Square150x150Logo="Assets\Square150x150Logo.png">
+        <uap:DefaultTile
+          Wide310x150Logo="Assets\Wide310x150Logo.png"
+          Square310x310Logo="Assets\Square310x310Logo.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <desktop:Extension
+          Category="windows.startupTask"
+          Executable="AutoMarkerReID.App.exe"
+          EntryPoint="Windows.FullTrustApplication"
+          uap10:Parameters="--startup">
+          <desktop:StartupTask TaskId="AutoMarkerReIDStartup" Enabled="false" DisplayName="AutoMarker Re-ID" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

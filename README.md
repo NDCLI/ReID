@@ -72,7 +72,22 @@ $env:Path = 'C:\Program Files\dotnet;' + $env:Path
 
 File tạo ra nằm tại `artifacts\setup\AutoMarkerReID-Setup-<version>-win-x64.exe`. Có thể truyền `-CertificateThumbprint` hoặc `-PfxPath` để ký Authenticode khi phát hành.
 
+### Microsoft Store (MSIX)
+
+Đăng ký/tạo app trong Partner Center, rồi lấy chính xác hai giá trị **Package/Identity/Name** và **Package/Identity/Publisher** ở trang Product identity. Build gói Store bằng:
+
+```powershell
+$env:Path = 'C:\Program Files\dotnet;' + $env:Path
+.\store\Build-StoreMsix.ps1 -Version 1.0.7.0
+```
+
+File tải lên Partner Center nằm tại `artifacts\store\*.msixupload`. Pipeline dùng Windows SDK BuildTools chính thức từ NuGet nên không cần Visual Studio; Microsoft Store sẽ ký gói sau khi duyệt. Có thể build kiểm tra cấu trúc bằng `-TestIdentity`, nhưng tuyệt đối không tải gói test đó lên Store.
+
+Xem [hướng dẫn và checklist gửi Store](store/STORE-SUBMISSION.md) cùng [chính sách quyền riêng tư](PRIVACY.md).
+
 ## Tài liệu kỹ thuật
 
 - [Đặc tả tính năng và logic](APP_FEATURES_AND_LOGIC.md)
+- [Chuẩn bị Microsoft Store](store/STORE-SUBMISSION.md)
+- [Chính sách quyền riêng tư](PRIVACY.md)
 - [Lịch sử phát hành](https://github.com/NDCLI/ReID/releases)

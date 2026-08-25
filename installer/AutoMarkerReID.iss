@@ -46,7 +46,7 @@ Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Parameters: "--show
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Parameters: "--show"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "AutoMarkerReID"; ValueData: """{app}\{#AppExeName}"""; Flags: uninsdeletevalue; Tasks: startup
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "AutoMarkerReID"; ValueData: """{app}\{#AppExeName}"" --startup"; Flags: uninsdeletevalue; Tasks: startup
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Parameters: "--show"; Description: "Mở {#AppName}"; Flags: nowait postinstall skipifsilent

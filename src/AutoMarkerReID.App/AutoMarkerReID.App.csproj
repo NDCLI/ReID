@@ -2,7 +2,8 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(StoreBuild)' != 'true'">net10.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(StoreBuild)' == 'true'">net10.0-windows10.0.19041.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
@@ -18,6 +19,20 @@
     <Version>1.0.4</Version>
     <FileVersion>1.0.4.0</FileVersion>
     <AssemblyVersion>1.0.4.0</AssemblyVersion>
+    <EnableMsixTooling Condition="'$(StoreBuild)' == 'true'">true</EnableMsixTooling>
+    <WindowsPackageType Condition="'$(StoreBuild)' == 'true'">MSIX</WindowsPackageType>
+    <PublishAppxPackage Condition="'$(StoreBuild)' == 'true'">true</PublishAppxPackage>
+    <GenerateAppxPackageOnBuild Condition="'$(StoreBuild)' == 'true'">true</GenerateAppxPackageOnBuild>
+    <AppxPackageSigningEnabled Condition="'$(StoreBuild)' == 'true'">false</AppxPackageSigningEnabled>
+    <AppxBundle Condition="'$(StoreBuild)' == 'true'">Never</AppxBundle>
+    <UapAppxPackageBuildMode Condition="'$(StoreBuild)' == 'true'">StoreOnly</UapAppxPackageBuildMode>
+    <AppxPackageIncludePrivateSymbols Condition="'$(StoreBuild)' == 'true'">false</AppxPackageIncludePrivateSymbols>
+    <AppxSymbolPackageEnabled Condition="'$(StoreBuild)' == 'true'">false</AppxSymbolPackageEnabled>
+    <GenerateAppInstallerFile Condition="'$(StoreBuild)' == 'true'">false</GenerateAppInstallerFile>
+    <SelfContained Condition="'$(StoreBuild)' == 'true'">true</SelfContained>
+    <TargetPlatformVersion Condition="'$(StoreBuild)' == 'true'">10.0.26100.0</TargetPlatformVersion>
+    <TargetPlatformMinVersion Condition="'$(StoreBuild)' == 'true'">10.0.19041.0</TargetPlatformMinVersion>
+    <MrmSupportLibraryPath Condition="'$(StoreBuild)' == 'true'">$(PkgMicrosoft_Windows_SDK_BuildTools)\bin\10.0.26100.0\x64\mrmsupport.dll</MrmSupportLibraryPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -32,6 +47,8 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.MSIX" Condition="'$(StoreBuild)' == 'true'" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Condition="'$(StoreBuild)' == 'true'" PrivateAssets="all" GeneratePathProperty="true" />
   </ItemGroup>
 
   <ItemGroup>
@@ -40,6 +57,14 @@
              CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\assets\**\*"
              Link="assets\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(StoreBuild)' == 'true'">
+    <AppxManifest Include="$(StoreManifestPath)" />
+    <Content Include="$(StoreAssetsPath)\**\*.png"
+             Link="Assets\%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>

@@ -43,7 +43,7 @@ public partial class App : System.Windows.Application
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         MainWindow = mainWindow;
         mainWindow.Show();
-        if (!e.Args.Contains("--show", StringComparer.OrdinalIgnoreCase))
+        if (e.Args.Contains("--startup", StringComparer.OrdinalIgnoreCase))
         {
             mainWindow.Hide();
         }
