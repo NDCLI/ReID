@@ -13,7 +13,9 @@ public sealed record StoragePaths(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "ReIDAutoOSNet",
             "models");
-    public string UiTemplate => UiTemplateOverride ?? Path.Combine(BaseDirectory, "assets", "ui_template.png");
+    // The interface template is an application asset, not user data. The data
+    // directory normally lives under LocalAppData and does not contain assets.
+    public string UiTemplate => UiTemplateOverride ?? Path.Combine(AppContext.BaseDirectory, "assets", "ui_template.png");
 
     public void EnsureCreated()
     {
