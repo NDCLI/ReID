@@ -1,51 +1,79 @@
 # AutoMarker Re-ID
 
-Ứng dụng Windows desktop thuần C#/.NET 10 để thu thập Query, nhận diện Re-ID, review/đánh dấu kết quả và quản lý thư viện ảnh. Runtime không dùng Python.
+Ứng dụng Windows chạy cục bộ để lưu ảnh tham chiếu theo Query, nhận diện Re-ID trên ảnh chụp, review kết quả và quản lý thư viện ảnh. Ứng dụng viết bằng C#/.NET 10, WPF, OpenCV và OpenVINO; không cần Python hoặc dịch vụ cloud khi chạy.
 
-## Tech stack
+**Bản mới nhất:** [v1.0.6](https://github.com/NDCLI/ReID/releases/tag/v1.0.6)
 
-- C# 14, .NET 10, WPF
-- OpenCvSharp cho ảnh, candidate, hash, LBP, editor và vẽ khung
-- OpenVINO native runtime qua C# P/Invoke bridge cho 3 model OSNet, face detection/Re-ID và PP-OCRv6
-- Microsoft Generic Host/DI, CommunityToolkit.Mvvm
-- xUnit cho unit/integration tests
+## Cài đặt nhanh
 
-## Chạy ứng dụng
+1. Tải `AutoMarkerReID-Setup-1.0.6-win-x64.exe` từ [Release](https://github.com/NDCLI/ReID/releases/latest).
+2. Chạy Setup và giữ lựa chọn **Khởi động AutoMarker Re-ID cùng Windows** nếu muốn app tự chạy nền sau khi đăng nhập.
+3. Mở app từ Start Menu hoặc shortcut. App có thể khởi động ẩn ở System Tray; dùng menu tray để hiện cửa sổ chính hoặc thoát hoàn toàn.
 
-```powershell
-dotnet run --project src\AutoMarkerReID.App\AutoMarkerReID.App.csproj -- --show
+Setup là bản x64 self-contained: máy cài không cần cài .NET runtime riêng. Windows 10 1809 trở lên được hỗ trợ.
+
+## Chức năng chính
+
+- Lưu crop người vào `Query_N` được chọn thủ công từ danh sách **Lưu ảnh tham chiếu vào**.
+- Chọn một Query hoặc Root/Tất cả Query làm phạm vi nhận diện.
+- Nhận diện Re-ID cục bộ bằng OpenVINO, OSNet, OCR timestamp; có tùy chọn đối chiếu trang phục (LBP).
+- Chụp vùng mới, chụp lại vùng gần nhất, mở Image Editor, xem thư viện kết quả và copy ảnh đánh dấu.
+- Tạo lại cache AI/OCR với log tiến độ theo từng ảnh tham chiếu.
+- Xóa vĩnh viễn toàn bộ Query, cache và kết quả `output` sau khi xác nhận.
+- Theo dõi Clipboard và nhận ảnh từ luồng chụp/sao chép được hỗ trợ.
+
+Hai lựa chọn Query là độc lập:
+
+- **Sidebar Query**: phạm vi người cần nhận diện.
+- **Lưu ảnh tham chiếu vào**: nơi lưu crop người mới.
+
+## Phím tắt và thao tác chuột
+
+| Phím/thao tác | Chức năng |
+| --- | --- |
+| `F2` | Chọn Query trống để lưu ảnh tham chiếu (chỉ khi Blaze hoặc Excel đang foreground) |
+| `F3` | Chọn Root/Tất cả Query để nhận diện |
+| `F4` / `F5` | Chuyển Query nhận diện trước / tiếp theo |
+| `Ctrl+Shift+1..9` | Chọn Query nhận diện theo vị trí |
+| `Alt+PrintScreen` | Chụp vùng mới |
+| `Alt+S` | Chụp lại vùng gần nhất |
+| `Ctrl+Alt+Shift+F10` | Trigger capture dự phòng cho tích hợp Blaze/AHK |
+| Chuột phải trong Blaze | Mở chụp vùng; click gốc không bị gửi đồng thời vào Blaze |
+| Chuột giữa trong Blaze hoặc Excel | Chuyển nhanh foreground giữa Blaze và Excel; thao tác chuột giữa gốc bị chặn |
+
+Trong Review: `Esc` hủy, click trái thêm/xóa khung, chuột phải lưu và copy. Trong thư viện: `←/→` đổi ảnh, `Ctrl+C` copy, `Delete` xóa, `Esc` đóng.
+
+## Dữ liệu ứng dụng
+
+Bản cài đặt lưu dữ liệu người dùng tại:
+
+```text
+%LOCALAPPDATA%\AutoMarkerReID\
+├── queries\Query_N\       # ảnh tham chiếu
+│   └── .cache\             # cache embedding và OCR
+└── output\Query_N\        # ảnh marked, ảnh gốc và metadata JSON
 ```
 
-Không truyền `--show` thì app khởi động ẩn ở System Tray. Dữ liệu nằm trong `queries/` và `output/` tại thư mục chạy; có thể đặt `AUTOMARKER_DATA_DIR` để đổi thư mục dữ liệu.
+Có thể đổi thư mục dữ liệu bằng biến môi trường `AUTOMARKER_DATA_DIR`. Nút **Xóa toàn bộ dữ liệu** xóa vĩnh viễn toàn bộ nội dung trên, không chuyển vào Recycle Bin.
 
-Với bản cài đặt, dữ liệu người dùng được lưu tại `%LOCALAPPDATA%\AutoMarkerReID` để app không cần quyền ghi vào thư mục cài đặt.
+## Phát triển và kiểm tra
 
-## CLI
-
-```powershell
-dotnet run --project src\AutoMarkerReID.Cli\AutoMarkerReID.Cli.csproj -- --help
-dotnet run --project src\AutoMarkerReID.Cli\AutoMarkerReID.Cli.csproj -- --single screenshot.png --query Query_1
-```
-
-Không có `--single`, CLI theo dõi Clipboard đến khi nhấn `Ctrl+C`.
-
-## Kiểm tra và publish
+Yêu cầu: Windows, .NET 10 SDK x64. Để build Setup cần thêm Inno Setup 6.
 
 ```powershell
-dotnet build AutoMarkerReID.slnx -c Release
-dotnet test tests\AutoMarkerReID.Tests\AutoMarkerReID.Tests.csproj -c Release
-dotnet publish src\AutoMarkerReID.App\AutoMarkerReID.App.csproj -c Release -r win-x64 --self-contained false -o artifacts\publish\gui
-dotnet publish src\AutoMarkerReID.Cli\AutoMarkerReID.Cli.csproj -c Release -r win-x64 --self-contained false -o artifacts\publish\cli
+& 'C:\Program Files\dotnet\dotnet.exe' test tests\AutoMarkerReID.Tests\AutoMarkerReID.Tests.csproj --no-restore --verbosity minimal
 ```
 
-Bản framework-dependent yêu cầu .NET Desktop Runtime 10 x64. Model và OCR asset được copy vào thư mục publish.
-
-## Tạo bộ cài Windows
-
-Icon của bản ReID cũ được dùng thống nhất cho cửa sổ, file thực thi, shortcut và bộ cài. Chạy:
+Tạo Setup self-contained:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File installer\Build-Setup.ps1
+$env:Path = 'C:\Program Files\dotnet;' + $env:Path
+.\installer\Build-Setup.ps1 -Version 1.0.6
 ```
 
-Script tạo bản self-contained x64 và file `AutoMarkerReID-Setup-<version>-win-x64.exe` trong `artifacts\setup`. Nếu có chứng thư Authenticode, truyền `-CertificateThumbprint` hoặc `-PfxPath`; script sẽ ký SHA-256 và đóng dấu thời gian cho ứng dụng lẫn bộ cài.
+File tạo ra nằm tại `artifacts\setup\AutoMarkerReID-Setup-<version>-win-x64.exe`. Có thể truyền `-CertificateThumbprint` hoặc `-PfxPath` để ký Authenticode khi phát hành.
+
+## Tài liệu kỹ thuật
+
+- [Đặc tả tính năng và logic](APP_FEATURES_AND_LOGIC.md)
+- [Lịch sử phát hành](https://github.com/NDCLI/ReID/releases)
