@@ -61,7 +61,8 @@ public static class MatchPostProcessor
     public static IReadOnlyList<MatchResult> Apply(
         IEnumerable<MatchResult> matches,
         IReadOnlyDictionary<string, QueryIdentity> queries,
-        BoundingBox? sourceCard = null)
+        BoundingBox? sourceCard = null,
+        string? sourceTimestamp = null)
     {
         var materialized = matches
             .Where(match => sourceCard is null || match.BoundingBox.IntersectionOverUnion(sourceCard.Value) <= ReIdDefaults.NmsThreshold)
@@ -92,9 +93,20 @@ public static class MatchPostProcessor
 
         if (queries.TryGetValue(dominant, out var query))
         {
+            var timestampLimits = query.References
+                .Where(reference => !string.IsNullOrWhiteSpace(reference.Timestamp))
+                .GroupBy(reference => reference.Timestamp!, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => Math.Max(0, group.Count() -
+                        (string.Equals(group.Key, sourceTimestamp, StringComparison.OrdinalIgnoreCase) ? 1 : 0)),
+                    StringComparer.OrdinalIgnoreCase);
             filtered = filtered
-                .OrderByDescending(match => match.Score)
-                .Take(query.MatchLimit)
+                .Where(match => match.CardTimestamp is not null && timestampLimits.ContainsKey(match.CardTimestamp))
+                .GroupBy(match => match.CardTimestamp!, StringComparer.OrdinalIgnoreCase)
+                .SelectMany(group => group
+                    .OrderByDescending(match => match.Score)
+                    .Take(timestampLimits[group.Key]))
                 .OrderBy(match => match.BoundingBox.CenterY)
                 .ThenBy(match => match.BoundingBox.X1)
                 .ToList();

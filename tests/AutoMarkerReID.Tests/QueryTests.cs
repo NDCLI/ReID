@@ -128,6 +128,28 @@ public sealed class QueryTests
             StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task MatchEngineRejectsCardWhenTimestampCannotBeRead()
+    {
+        var runtime = new FakeRuntime();
+        var catalog = new QueryCatalog();
+        catalog.Replace([new QueryIdentity("Query_4", [new ReferenceImage(
+            "reference", "Query_4", "reference.png",
+            new Dictionary<string, float[]> { ["model"] = [1, 0, 0] },
+            "12:17 PM", null, DateTimeOffset.UtcNow)], 0.65f)]);
+        var engine = new OpenVinoMatchEngine(runtime, new OpenCvImageCodec(), new SingleCandidateGenerator(),
+            new OpenCvBoxRenderer(), new FakeOcr(null), catalog, new UserSelectionState(),
+            NullLogger<OpenVinoMatchEngine>.Instance);
+
+        var matches = await engine.MatchAsync(ImagingTests.Gradient(60, 140), "Query_4", CancellationToken.None);
+
+        Assert.Empty(matches);
+        Assert.Equal(0, runtime.BodyEmbeddingCalls);
+        Assert.Equal(0, runtime.FaceDetectionCalls);
+        Assert.Contains("không đọc được timestamp", Assert.Single(engine.LastExplanations).Reason,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string CreateRoot()
     {
         var path = Path.Combine(Path.GetTempPath(), $"automarker-queries-{Guid.NewGuid():N}");
@@ -138,13 +160,17 @@ public sealed class QueryTests
     private sealed class FakeRuntime : IModelRuntime
     {
         public bool HasVisibleFace { get; init; } = true;
+        public int BodyEmbeddingCalls { get; private set; }
         public int FaceDetectionCalls { get; private set; }
         public int FaceEmbeddingCalls { get; private set; }
         public bool IsAvailable => true;
         public IReadOnlyList<string> ActiveBodyModels => ["model"];
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task<IReadOnlyDictionary<string, float[]>> ExtractBodyEmbeddingsAsync(ImageFrame image, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyDictionary<string, float[]>>(new Dictionary<string, float[]> { ["model"] = [1, 0, 0] });
+        public Task<IReadOnlyDictionary<string, float[]>> ExtractBodyEmbeddingsAsync(ImageFrame image, CancellationToken cancellationToken)
+        {
+            BodyEmbeddingCalls++;
+            return Task.FromResult<IReadOnlyDictionary<string, float[]>>(new Dictionary<string, float[]> { ["model"] = [1, 0, 0] });
+        }
         public Task<bool> HasVisibleFaceAsync(ImageFrame image, CancellationToken cancellationToken)
         {
             FaceDetectionCalls++;
@@ -164,9 +190,9 @@ public sealed class QueryTests
             [new(new BoundingBox(0, 0, screenshot.Width, screenshot.Height), 1, 0)];
     }
 
-    private sealed class FakeOcr : IOcrService
+    private sealed class FakeOcr(string? timestamp = "7:42 AM") : IOcrService
     {
-        public Task<string?> ReadTimestampAsync(ImageFrame card, CancellationToken cancellationToken) => Task.FromResult<string?>("7:42 AM");
+        public Task<string?> ReadTimestampAsync(ImageFrame card, CancellationToken cancellationToken) => Task.FromResult(timestamp);
     }
 
     private sealed class RecordingTrashService : IFileTrashService

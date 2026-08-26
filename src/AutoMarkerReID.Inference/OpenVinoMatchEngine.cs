@@ -48,6 +48,13 @@ public sealed class OpenVinoMatchEngine(
         }
 
         var source = candidates.FirstOrDefault(candidate => candidate.IsSource);
+        string? sourceTimestamp = null;
+        if (source is not null)
+        {
+            var sourceCrop = codec.Crop(screenshot, source.BoundingBox);
+            sourceTimestamp = await ocr.ReadTimestampAsync(sourceCrop, cancellationToken).ConfigureAwait(false);
+        }
+
         var accepted = new List<MatchResult>();
         foreach (var candidate in candidates.Where(candidate => !candidate.IsSource))
         {
@@ -56,6 +63,13 @@ public sealed class OpenVinoMatchEngine(
             {
                 var crop = codec.Crop(screenshot, candidate.BoundingBox);
                 var timestamp = await ocr.ReadTimestampAsync(crop, cancellationToken).ConfigureAwait(false);
+                if (timestamp is null)
+                {
+                    explanations.Add(new RecognitionExplanation(candidate.BoundingBox, null, 0, 0, null, null,
+                        false, "Bị loại: không đọc được timestamp của card.", new Dictionary<string, float>()));
+                    continue;
+                }
+
                 var embeddings = await runtime.ExtractBodyEmbeddingsAsync(crop, cancellationToken).ConfigureAwait(false);
                 if (embeddings.Count == 0)
                 {
@@ -73,7 +87,7 @@ public sealed class OpenVinoMatchEngine(
                 if (evaluations.Count == 0)
                 {
                     explanations.Add(new RecognitionExplanation(candidate.BoundingBox, null, 0, 0, null, null,
-                        false, timestamp is null ? "Không có reference phù hợp." : "Không có reference cùng timestamp.",
+                        false, "Không có reference cùng timestamp.",
                         new Dictionary<string, float>()));
                     continue;
                 }
@@ -114,8 +128,7 @@ public sealed class OpenVinoMatchEngine(
                     appearanceScore,
                     appearanceMargin);
                 var threshold = selection.MatchThresholdOverride ?? winner.Query.CalibratedThreshold;
-                var timestampMatched = timestamp is not null &&
-                                       string.Equals(timestamp, winner.BestReference?.Timestamp, StringComparison.OrdinalIgnoreCase);
+                var timestampMatched = string.Equals(timestamp, winner.BestReference?.Timestamp, StringComparison.OrdinalIgnoreCase);
                 var decision = IdentityDecisionPolicy.Decide(score, threshold, selection.AppearanceEnabled, timestampMatched);
                 var acceptedByGates = decision.Accepted && decision.Source is not null;
                 var reason = ExplainDecision(decision, score, threshold);
@@ -127,7 +140,7 @@ public sealed class OpenVinoMatchEngine(
                     continue;
                 }
 
-                if (timestamp is not null && !string.Equals(timestamp, winner.BestReference?.Timestamp, StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(timestamp, winner.BestReference?.Timestamp, StringComparison.OrdinalIgnoreCase))
                 {
                     explanations.Add(new RecognitionExplanation(candidate.BoundingBox, winner.Query.Id,
                         winner.EnsembleScore, threshold, bodyMargin, winner.BestReferenceScore,
@@ -165,7 +178,7 @@ public sealed class OpenVinoMatchEngine(
             }
         }
 
-        var postProcessed = MatchPostProcessor.Apply(accepted, scopedQueries, source?.BoundingBox);
+        var postProcessed = MatchPostProcessor.Apply(accepted, scopedQueries, source?.BoundingBox, sourceTimestamp);
         var retainedBoxes = postProcessed.Select(match => match.BoundingBox).ToHashSet();
         var finalExplanations = explanations.Select(item =>
             item.Accepted && !retainedBoxes.Contains(boxRenderer.SnapToCard(screenshot, item.BoundingBox))
@@ -200,16 +213,14 @@ public sealed class OpenVinoMatchEngine(
         return reasons.Count == 0 ? "Không vượt qua các điều kiện open-set." : "Bị loại: " + string.Join(", ", reasons) + ".";
     }
 
-    private static QueryEvaluation? EvaluateQuery(QueryIdentity query, IReadOnlyDictionary<string, float[]> candidate, string? timestamp)
+    private static QueryEvaluation? EvaluateQuery(QueryIdentity query, IReadOnlyDictionary<string, float[]> candidate, string timestamp)
     {
-        IReadOnlyList<ReferenceImage> references = query.References;
-        if (timestamp is not null)
+        var references = query.References
+            .Where(reference => string.Equals(reference.Timestamp, timestamp, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (references.Length == 0)
         {
-            references = references.Where(reference => string.Equals(reference.Timestamp, timestamp, StringComparison.OrdinalIgnoreCase)).ToArray();
-            if (references.Count == 0)
-            {
-                return null;
-            }
+            return null;
         }
 
         var modelScores = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);

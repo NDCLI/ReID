@@ -62,7 +62,7 @@ public sealed class GeometryAndPolicyTests
             ["Query_1"] = Query("Query_1", 3),
             ["Query_2"] = Query("Query_2", 3),
         };
-        var result = MatchPostProcessor.Apply(matches, queries, source);
+        var result = MatchPostProcessor.Apply(matches, queries, source, "12:00 PM");
         Assert.Equal(2, result.Count);
         Assert.All(result, item => Assert.Equal("Query_1", item.QueryId));
         Assert.DoesNotContain(result, item => item.BoundingBox == source);
@@ -96,6 +96,32 @@ public sealed class GeometryAndPolicyTests
     }
 
     [Fact]
+    public void PostProcessorAppliesReferenceQuotaPerTimestampAndSubtractsSourceTimestamp()
+    {
+        var matches = new[]
+        {
+            Match("Query_1", new BoundingBox(100, 0, 160, 100), 0.99f, "12:16 PM"),
+            Match("Query_1", new BoundingBox(170, 0, 230, 100), 0.80f, "12:17 PM"),
+            Match("Query_1", new BoundingBox(240, 0, 300, 100), 0.90f, "12:17 PM"),
+            Match("Query_1", new BoundingBox(310, 0, 370, 100), 0.70f, "12:04 PM"),
+            Match("Query_1", new BoundingBox(380, 0, 440, 100), 0.95f, "12:04 PM"),
+            Match("Query_1", new BoundingBox(450, 0, 510, 100), 0.85f, "12:04 PM"),
+            Match("Query_1", new BoundingBox(520, 0, 580, 100), 1.00f, "5:27 PM"),
+            Match("Query_1", new BoundingBox(590, 0, 650, 100), 1.00f, null),
+        };
+        var query = Query("Query_1", "12:16 PM", "12:17 PM", "12:04 PM", "12:04 PM");
+
+        var result = MatchPostProcessor.Apply(matches,
+            new Dictionary<string, QueryIdentity> { [query.Id] = query }, sourceTimestamp: "12:16 PM");
+
+        Assert.Equal(3, result.Count);
+        Assert.DoesNotContain(result, match => match.CardTimestamp is null or "12:16 PM" or "5:27 PM");
+        Assert.Single(result, match => match.CardTimestamp == "12:17 PM");
+        Assert.Equal(2, result.Count(match => match.CardTimestamp == "12:04 PM"));
+        Assert.DoesNotContain(result, match => match.BoundingBox.X1 is 170 or 310);
+    }
+
+    [Fact]
     public void ManualSpacingDoesNotLimitNumberOfBoxes()
     {
         var matches = Enumerable.Range(0, 12)
@@ -109,10 +135,12 @@ public sealed class GeometryAndPolicyTests
         "Query_1", ensemble, runnerUp, reference,
         new Dictionary<string, string> { ["m1"] = "Query_1", ["m2"] = "Query_1" }, "r1");
 
-    private static MatchResult Match(string query, BoundingBox box, float score) => new(
-        query, null, box, score, null, null, null, new Dictionary<string, float>(), null, MatchSource.Body);
+    private static MatchResult Match(string query, BoundingBox box, float score, string? timestamp = "12:00 PM") => new(
+        query, null, box, score, null, null, null, new Dictionary<string, float>(), timestamp, MatchSource.Body);
 
-    private static QueryIdentity Query(string id, int count) => new(id,
-        Enumerable.Range(0, count).Select(index => new ReferenceImage($"r{index}", id, $"r{index}.png",
-            new Dictionary<string, float[]>(), null, null, DateTimeOffset.UtcNow)).ToArray(), 0.68f);
+    private static QueryIdentity Query(string id, int count) => Query(id, Enumerable.Repeat("12:00 PM", count).ToArray());
+
+    private static QueryIdentity Query(string id, params string[] timestamps) => new(id,
+        timestamps.Select((timestamp, index) => new ReferenceImage($"r{index}", id, $"r{index}.png",
+            new Dictionary<string, float[]>(), timestamp, null, DateTimeOffset.UtcNow)).ToArray(), 0.68f);
 }
