@@ -18,12 +18,15 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IModelRuntime _runtime;
     private readonly IOcrService _ocr;
     private readonly ClipboardActivityStats _clipboardActivity;
+    private readonly IQueryRepository _queryRepository;
+    private readonly IResultRepository _resultRepository;
     private readonly List<ObservableLogEntry> _allLogEntries = [];
     private string? _restoredRecognitionScope;
 
     public MainViewModel(ApplicationController controller, QueryCatalog catalog, UserSelectionState selection,
         UserPreferencesStore preferences, IModelRuntime runtime, IOcrService ocr,
-        ClipboardActivityStats clipboardActivity, ObservableLogStore logs)
+        ClipboardActivityStats clipboardActivity, ObservableLogStore logs,
+        IQueryRepository queryRepository, IResultRepository resultRepository)
     {
         _controller = controller;
         _catalog = catalog;
@@ -32,6 +35,8 @@ public sealed partial class MainViewModel : ObservableObject
         _runtime = runtime;
         _ocr = ocr;
         _clipboardActivity = clipboardActivity;
+        _queryRepository = queryRepository;
+        _resultRepository = resultRepository;
         _restoredRecognitionScope = selection.RecognitionScope;
         _targetQuery = selection.TargetQuery;
         _appearanceEnabled = selection.AppearanceEnabled;
@@ -114,6 +119,8 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand] private void DeleteQuery() => DeleteQueryRequested?.Invoke(this, EventArgs.Empty);
     [RelayCommand] private void ShowHotkeys() => HotkeyDetailsRequested?.Invoke(this, EventArgs.Empty);
     [RelayCommand] private void SelectEmptyTarget() => SelectEmptyQuery();
+    [RelayCommand] private void OpenQueriesFolder() => OpenFolder(_queryRepository.RootPath);
+    [RelayCommand] private void OpenOutputFolder() => OpenFolder((_resultRepository as AutoMarkerReID.Persistence.FileResultRepository)?.RootPath ?? Path.Combine(Path.GetDirectoryName(_queryRepository.RootPath)!, "output"));
 
     [RelayCommand]
     private void ClearLog()
@@ -259,6 +266,12 @@ public sealed partial class MainViewModel : ObservableObject
         try { _preferences.Save(_selection); }
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
+    }
+
+    private static void OpenFolder(string path)
+    {
+        if (Directory.Exists(path))
+            System.Diagnostics.Process.Start("explorer.exe", path);
     }
 
     private static int QueryNumber(string queryId) => int.TryParse(queryId.AsSpan("Query_".Length), out var number) ? number : int.MaxValue;

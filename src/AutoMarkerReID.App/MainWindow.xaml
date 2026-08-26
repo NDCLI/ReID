@@ -61,6 +61,8 @@
                         <Button Content="Kết quả đã lưu" ToolTip="Xem và chỉnh sửa các kết quả nhận diện đã lưu" Command="{Binding OpenLibraryCommand}" />
                         <Button Content="Chỉnh sửa ảnh" ToolTip="Mở một ảnh có sẵn để cắt, xóa dải hoặc ghép ảnh" Command="{Binding EditImageCommand}" />
                         <Button Content="Ảnh chụp gần đây" ToolTip="Xem các ảnh đã chụp và mở trình chỉnh sửa" Command="{Binding OpenLatestCaptureCommand}" />
+                        <Button Content="Mở thư mục Queries" ToolTip="Mở thư mục chứa ảnh tham chiếu Query" Command="{Binding OpenQueriesFolderCommand}" />
+                        <Button Content="Mở thư mục Output" ToolTip="Mở thư mục chứa kết quả nhận diện đã lưu" Command="{Binding OpenOutputFolderCommand}" />
                         <Button Content="Xóa toàn bộ dữ liệu" ToolTip="Xóa vĩnh viễn Query, cache AI và toàn bộ output" Command="{Binding DeleteQueryCommand}" />
                         <Button Content="Tạo lại dữ liệu AI" ToolTip="Tạo lại đặc trưng nhận diện và dữ liệu OCR từ ảnh Query" Command="{Binding RebuildCacheCommand}" />
                         <Button Content="Dọn nhật ký" ToolTip="Xóa toàn bộ nội dung nhật ký hoạt động" Command="{Binding ClearLogCommand}" />
