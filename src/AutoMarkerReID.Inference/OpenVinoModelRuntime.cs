@@ -91,29 +91,7 @@ public sealed class OpenVinoModelRuntime(ModelLocations locations, ILogger<OpenV
         await _inferenceLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var detections = InferRaw(_faceDetector, image);
-            BoundingBox? bestFace = null;
-            var bestConfidence = 0f;
-            for (var offset = 0; offset + 6 < detections.Length; offset += 7)
-            {
-                var confidence = detections[offset + 2];
-                if (confidence < ReIdDefaults.FaceDetectionThreshold || confidence <= bestConfidence)
-                {
-                    continue;
-                }
-
-                var box = new BoundingBox(
-                    (int)Math.Round(detections[offset + 3] * image.Width),
-                    (int)Math.Round(detections[offset + 4] * image.Height),
-                    (int)Math.Round(detections[offset + 5] * image.Width),
-                    (int)Math.Round(detections[offset + 6] * image.Height)).Clamp(image.Width, image.Height);
-                if (box.Area > 0)
-                {
-                    bestFace = box;
-                    bestConfidence = confidence;
-                }
-            }
-
+            var bestFace = DetectBestFace(image);
             if (bestFace is null)
             {
                 return null;
@@ -128,6 +106,30 @@ public sealed class OpenVinoModelRuntime(ModelLocations locations, ILogger<OpenV
         {
             OpenVinoRuntimeLog.InferenceFailed(logger, "face", exception);
             return null;
+        }
+        finally
+        {
+            _inferenceLock.Release();
+        }
+    }
+
+    public async Task<bool> HasVisibleFaceAsync(ImageFrame image, CancellationToken cancellationToken)
+    {
+        EnsureInitialized();
+        if (_faceDetector is null)
+        {
+            return false;
+        }
+
+        await _inferenceLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return DetectBestFace(image) is not null;
+        }
+        catch (Exception exception)
+        {
+            OpenVinoRuntimeLog.InferenceFailed(logger, "face_detector", exception);
+            return false;
         }
         finally
         {
@@ -192,6 +194,34 @@ public sealed class OpenVinoModelRuntime(ModelLocations locations, ILogger<OpenV
         }
 
         return output;
+    }
+
+    private BoundingBox? DetectBestFace(ImageFrame image)
+    {
+        var detections = InferRaw(_faceDetector!, image);
+        BoundingBox? bestFace = null;
+        var bestConfidence = 0f;
+        for (var offset = 0; offset + 6 < detections.Length; offset += 7)
+        {
+            var confidence = detections[offset + 2];
+            if (confidence < ReIdDefaults.FaceDetectionThreshold || confidence <= bestConfidence)
+            {
+                continue;
+            }
+
+            var box = new BoundingBox(
+                (int)Math.Round(detections[offset + 3] * image.Width),
+                (int)Math.Round(detections[offset + 4] * image.Height),
+                (int)Math.Round(detections[offset + 5] * image.Width),
+                (int)Math.Round(detections[offset + 6] * image.Height)).Clamp(image.Width, image.Height);
+            if (box.Area > 0)
+            {
+                bestFace = box;
+                bestConfidence = confidence;
+            }
+        }
+
+        return bestFace;
     }
 
     private static float[] InferRaw(LoadedModel model, ImageFrame image)

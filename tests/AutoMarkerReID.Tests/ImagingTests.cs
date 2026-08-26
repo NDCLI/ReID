@@ -96,7 +96,7 @@ public sealed class ImagingTests
     }
 
     [Fact]
-    public void SnapToCardPreservesOuterCardFrameAndClampsToScreenshot()
+    public void SnapToCardPreservesOuterCardFrameBesidePanelDividerAndClampsToScreenshot()
     {
         var image = CardGrid();
         var renderer = new OpenCvBoxRenderer();
@@ -190,6 +190,7 @@ public sealed class ImagingTests
         const int width = 220;
         const int height = 215;
         var pixels = Enumerable.Repeat((byte)18, width * height * 3).ToArray();
+        Fill(14, 0, 15, height, 8); // strong UI panel divider beside the first card
         Fill(30, 20, 90, 190, 165);
         Fill(105, 20, 165, 190, 145);
         Fill(52, 48, 70, 166, 65);

@@ -85,24 +85,7 @@ public sealed class OpenVinoMatchEngine(
                     model => evaluations.OrderByDescending(evaluation => evaluation.ModelScores.GetValueOrDefault(model)).First().Query.Id,
                     StringComparer.OrdinalIgnoreCase);
 
-                float? faceScore = null;
-                float? faceMargin = null;
                 var bodyMargin = winner.EnsembleScore - runnerUp;
-                var bodyClearlyAccepted = winner.EnsembleScore >= winner.Query.CalibratedThreshold &&
-                                          bodyMargin >= ReIdDefaults.AiMatchMargin &&
-                                          winner.BestReferenceScore >= ReIdDefaults.BestReferenceThreshold &&
-                                          modelWinners.Values.All(query => query.Equals(winner.Query.Id, StringComparison.OrdinalIgnoreCase));
-                if (!bodyClearlyAccepted)
-                {
-                    var face = await runtime.ExtractFaceEmbeddingAsync(crop, cancellationToken).ConfigureAwait(false);
-                    if (face is not null)
-                    {
-                        faceScore = BestFaceScore(winner.Query, face);
-                        var competingFace = evaluations.Skip(1).Select(evaluation => BestFaceScore(evaluation.Query, face)).DefaultIfEmpty(0).Max();
-                        faceMargin = faceScore - competingFace;
-                    }
-                }
-
                 float? appearanceScore = null;
                 float? appearanceMargin = null;
                 if (selection.AppearanceEnabled)
@@ -126,8 +109,8 @@ public sealed class OpenVinoMatchEngine(
                     winner.BestReferenceScore,
                     modelWinners,
                     winner.BestReference?.Id,
-                    faceScore,
-                    faceMargin,
+                    null,
+                    null,
                     appearanceScore,
                     appearanceMargin);
                 var threshold = selection.MatchThresholdOverride ?? winner.Query.CalibratedThreshold;
@@ -149,6 +132,14 @@ public sealed class OpenVinoMatchEngine(
                     explanations.Add(new RecognitionExplanation(candidate.BoundingBox, winner.Query.Id,
                         winner.EnsembleScore, threshold, bodyMargin, winner.BestReferenceScore,
                         false, $"Bị loại: timestamp {timestamp} không khớp reference.", winner.ModelScores));
+                    continue;
+                }
+
+                if (!await runtime.HasVisibleFaceAsync(crop, cancellationToken).ConfigureAwait(false))
+                {
+                    explanations.Add(new RecognitionExplanation(candidate.BoundingBox, winner.Query.Id,
+                        winner.EnsembleScore, threshold, bodyMargin, winner.BestReferenceScore,
+                        false, "Bị loại: không phát hiện khuôn mặt trong card.", winner.ModelScores));
                     continue;
                 }
 
@@ -254,12 +245,6 @@ public sealed class OpenVinoMatchEngine(
             ? null
             : new QueryEvaluation(query, (float)(weightedScore / totalWeight), bestReferenceScore, bestReference, modelScores);
     }
-
-    private static float BestFaceScore(QueryIdentity query, float[] face) => query.References
-        .Where(reference => reference.Embeddings.TryGetValue("face", out var stored) && stored.Length == face.Length)
-        .Select(reference => Dot(face, reference.Embeddings["face"]))
-        .DefaultIfEmpty(0)
-        .Max();
 
     private static float BestAppearanceScore(QueryIdentity query, float[] descriptor) => query.References
         .Where(reference => reference.AppearanceDescriptor is { Length: 512 })

@@ -3,6 +3,7 @@ using AutoMarkerReID.Domain;
 using AutoMarkerReID.Imaging;
 using AutoMarkerReID.Inference;
 using AutoMarkerReID.Persistence;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AutoMarkerReID.Tests;
 
@@ -105,6 +106,28 @@ public sealed class QueryTests
         }
     }
 
+    [Fact]
+    public async Task MatchEngineRejectsBodyMatchWhenNoFaceIsDetected()
+    {
+        var runtime = new FakeRuntime { HasVisibleFace = false };
+        var catalog = new QueryCatalog();
+        catalog.Replace([new QueryIdentity("Query_12", [new ReferenceImage(
+            "reference", "Query_12", "reference.png",
+            new Dictionary<string, float[]> { ["model"] = [1, 0, 0] },
+            "7:42 AM", null, DateTimeOffset.UtcNow)], 0.65f)]);
+        var engine = new OpenVinoMatchEngine(runtime, new OpenCvImageCodec(), new SingleCandidateGenerator(),
+            new OpenCvBoxRenderer(), new FakeOcr(), catalog, new UserSelectionState(),
+            NullLogger<OpenVinoMatchEngine>.Instance);
+
+        var matches = await engine.MatchAsync(ImagingTests.Gradient(60, 140), "Query_12", CancellationToken.None);
+
+        Assert.Empty(matches);
+        Assert.Equal(1, runtime.FaceDetectionCalls);
+        Assert.Equal(0, runtime.FaceEmbeddingCalls);
+        Assert.Contains("không phát hiện khuôn mặt", Assert.Single(engine.LastExplanations).Reason,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string CreateRoot()
     {
         var path = Path.Combine(Path.GetTempPath(), $"automarker-queries-{Guid.NewGuid():N}");
@@ -114,13 +137,31 @@ public sealed class QueryTests
 
     private sealed class FakeRuntime : IModelRuntime
     {
+        public bool HasVisibleFace { get; init; } = true;
+        public int FaceDetectionCalls { get; private set; }
+        public int FaceEmbeddingCalls { get; private set; }
         public bool IsAvailable => true;
         public IReadOnlyList<string> ActiveBodyModels => ["model"];
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<IReadOnlyDictionary<string, float[]>> ExtractBodyEmbeddingsAsync(ImageFrame image, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyDictionary<string, float[]>>(new Dictionary<string, float[]> { ["model"] = [1, 0, 0] });
-        public Task<float[]?> ExtractFaceEmbeddingAsync(ImageFrame image, CancellationToken cancellationToken) => Task.FromResult<float[]?>(null);
+        public Task<bool> HasVisibleFaceAsync(ImageFrame image, CancellationToken cancellationToken)
+        {
+            FaceDetectionCalls++;
+            return Task.FromResult(HasVisibleFace);
+        }
+        public Task<float[]?> ExtractFaceEmbeddingAsync(ImageFrame image, CancellationToken cancellationToken)
+        {
+            FaceEmbeddingCalls++;
+            return Task.FromResult<float[]?>(null);
+        }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class SingleCandidateGenerator : ICandidateGenerator
+    {
+        public IReadOnlyList<CardCandidate> Generate(ImageFrame screenshot) =>
+            [new(new BoundingBox(0, 0, screenshot.Width, screenshot.Height), 1, 0)];
     }
 
     private sealed class FakeOcr : IOcrService

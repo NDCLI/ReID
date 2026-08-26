@@ -410,6 +410,11 @@ public sealed class OpenCvBoxRenderer : IBoxRenderer
         int sampleTop, int sampleBottom, bool left)
     {
         var width = gray.Cols;
+        var immediateOutside = left ? expected - 1 : expected;
+        if (immediateOutside >= 0 && immediateOutside < width &&
+            IsDarkUniformColumn(gray, immediateOutside, sampleTop, sampleBottom))
+            return Math.Clamp(expected, 0, width);
+
         var nearStart = left ? expected - 3 : expected;
         var outerStart = left ? expected - radius : expected + 3;
         var outerEnd = left ? expected - 3 : expected + radius;
