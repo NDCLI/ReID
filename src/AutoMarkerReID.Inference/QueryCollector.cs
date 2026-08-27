@@ -47,11 +47,6 @@ public sealed class QueryCollector(
             var embeddings = new Dictionary<string, float[]>(
                 await runtime.ExtractBodyEmbeddingsAsync(image, cancellationToken).ConfigureAwait(false),
                 StringComparer.OrdinalIgnoreCase);
-            var face = await runtime.ExtractFaceEmbeddingAsync(image, cancellationToken).ConfigureAwait(false);
-            if (face is not null)
-            {
-                embeddings["face"] = face;
-            }
 
             var reference = new ReferenceImage(
                 Path.GetFileNameWithoutExtension(imagePath),

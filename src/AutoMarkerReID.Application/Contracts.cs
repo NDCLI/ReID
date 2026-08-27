@@ -79,7 +79,6 @@ public interface IModelRuntime : IAsyncDisposable
     Task InitializeAsync(CancellationToken cancellationToken);
     Task<IReadOnlyDictionary<string, float[]>> ExtractBodyEmbeddingsAsync(ImageFrame image, CancellationToken cancellationToken);
     Task<bool> HasVisibleFaceAsync(ImageFrame image, CancellationToken cancellationToken);
-    Task<float[]?> ExtractFaceEmbeddingAsync(ImageFrame image, CancellationToken cancellationToken);
 }
 
 public interface IOcrService

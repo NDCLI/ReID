@@ -63,12 +63,6 @@ public sealed class OpenVinoMatchEngine(
             {
                 var crop = codec.Crop(screenshot, candidate.BoundingBox);
                 var timestamp = await ocr.ReadTimestampAsync(crop, cancellationToken).ConfigureAwait(false);
-                if (timestamp is null)
-                {
-                    explanations.Add(new RecognitionExplanation(candidate.BoundingBox, null, 0, 0, null, null,
-                        false, "Bị loại: không đọc được timestamp của card.", new Dictionary<string, float>()));
-                    continue;
-                }
 
                 var embeddings = await runtime.ExtractBodyEmbeddingsAsync(crop, cancellationToken).ConfigureAwait(false);
                 if (embeddings.Count == 0)
@@ -87,7 +81,7 @@ public sealed class OpenVinoMatchEngine(
                 if (evaluations.Count == 0)
                 {
                     explanations.Add(new RecognitionExplanation(candidate.BoundingBox, null, 0, 0, null, null,
-                        false, "Không có reference cùng timestamp.",
+                        false, $"Không có reference cùng timestamp {timestamp}.",
                         new Dictionary<string, float>()));
                     continue;
                 }
@@ -123,12 +117,11 @@ public sealed class OpenVinoMatchEngine(
                     winner.BestReferenceScore,
                     modelWinners,
                     winner.BestReference?.Id,
-                    null,
-                    null,
                     appearanceScore,
                     appearanceMargin);
                 var threshold = selection.MatchThresholdOverride ?? winner.Query.CalibratedThreshold;
-                var timestampMatched = string.Equals(timestamp, winner.BestReference?.Timestamp, StringComparison.OrdinalIgnoreCase);
+                var timestampMatched = timestamp is not null &&
+                                       string.Equals(timestamp, winner.BestReference?.Timestamp, StringComparison.OrdinalIgnoreCase);
                 var decision = IdentityDecisionPolicy.Decide(score, threshold, selection.AppearanceEnabled, timestampMatched);
                 var acceptedByGates = decision.Accepted && decision.Source is not null;
                 var reason = ExplainDecision(decision, score, threshold);
@@ -140,7 +133,7 @@ public sealed class OpenVinoMatchEngine(
                     continue;
                 }
 
-                if (!string.Equals(timestamp, winner.BestReference?.Timestamp, StringComparison.OrdinalIgnoreCase))
+                if (timestamp is not null && !string.Equals(timestamp, winner.BestReference?.Timestamp, StringComparison.OrdinalIgnoreCase))
                 {
                     explanations.Add(new RecognitionExplanation(candidate.BoundingBox, winner.Query.Id,
                         winner.EnsembleScore, threshold, bodyMargin, winner.BestReferenceScore,
@@ -148,13 +141,12 @@ public sealed class OpenVinoMatchEngine(
                     continue;
                 }
 
-                if (!await runtime.HasVisibleFaceAsync(crop, cancellationToken).ConfigureAwait(false))
-                {
-                    explanations.Add(new RecognitionExplanation(candidate.BoundingBox, winner.Query.Id,
-                        winner.EnsembleScore, threshold, bodyMargin, winner.BestReferenceScore,
-                        false, "Bị loại: không phát hiện khuôn mặt trong card.", winner.ModelScores));
-                    continue;
-                }
+                var hasVisibleFace = await runtime.HasVisibleFaceAsync(crop, cancellationToken).ConfigureAwait(false);
+                reason += hasVisibleFace
+                    ? " Hướng: thấy mặt, đang quay về camera."
+                    : " Hướng: không thấy mặt, có thể quay lưng hoặc quay nghiêng.";
+                if (timestamp is null)
+                    reason += " OCR không đọc được timestamp; đã dùng AI với toàn bộ reference.";
 
                 explanations.Add(new RecognitionExplanation(candidate.BoundingBox, winner.Query.Id,
                     winner.EnsembleScore, threshold, bodyMargin, winner.BestReferenceScore,
@@ -175,6 +167,8 @@ public sealed class OpenVinoMatchEngine(
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 MatchEngineLog.CandidateFailed(logger, candidate.BoundingBox.X1, candidate.BoundingBox.Y1, exception);
+                explanations.Add(new RecognitionExplanation(candidate.BoundingBox, null, 0, 0, null, null,
+                    false, $"Bị loại: lỗi xử lý candidate ({exception.GetType().Name}).", new Dictionary<string, float>()));
             }
         }
 
@@ -199,7 +193,6 @@ public sealed class OpenVinoMatchEngine(
 
             return decision.Source switch
             {
-                MatchSource.Face => "Đạt nhờ đối chiếu khuôn mặt.",
                 MatchSource.BodyWithAppearance => "Đạt nhờ LBP phân xử kết quả sát ngưỡng.",
                 _ => "Đạt score, margin và đồng thuận model.",
             };
@@ -213,11 +206,13 @@ public sealed class OpenVinoMatchEngine(
         return reasons.Count == 0 ? "Không vượt qua các điều kiện open-set." : "Bị loại: " + string.Join(", ", reasons) + ".";
     }
 
-    private static QueryEvaluation? EvaluateQuery(QueryIdentity query, IReadOnlyDictionary<string, float[]> candidate, string timestamp)
+    private static QueryEvaluation? EvaluateQuery(QueryIdentity query, IReadOnlyDictionary<string, float[]> candidate, string? timestamp)
     {
-        var references = query.References
-            .Where(reference => string.Equals(reference.Timestamp, timestamp, StringComparison.OrdinalIgnoreCase))
-            .ToArray();
+        var references = timestamp is null
+            ? query.References.ToArray()
+            : query.References
+                .Where(reference => string.Equals(reference.Timestamp, timestamp, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
         if (references.Length == 0)
         {
             return null;

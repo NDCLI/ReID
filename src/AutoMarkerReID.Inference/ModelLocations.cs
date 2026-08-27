@@ -10,7 +10,6 @@ public sealed record ModelLocations(string Directory)
     ];
 
     public string FaceDetection => Path.Combine(Directory, "face-detection-retail-0005.xml");
-    public string FaceReIdentification => Path.Combine(Directory, "face-reidentification-retail-0095.xml");
 }
 
 public sealed record BodyModelDefinition(string Name, string Path, float Weight, int InputHeight, int InputWidth);

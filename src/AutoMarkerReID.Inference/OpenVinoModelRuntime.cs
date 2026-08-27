@@ -13,7 +13,6 @@ public sealed class OpenVinoModelRuntime(ModelLocations locations, ILogger<OpenV
     private readonly SemaphoreSlim _inferenceLock = new(1, 1);
     private Core? _core;
     private LoadedModel? _faceDetector;
-    private LoadedModel? _faceReIdentifier;
 
     public bool IsAvailable => _bodyModels.Count > 0;
     public IReadOnlyList<string> ActiveBodyModels => _bodyModels.Keys.Order(StringComparer.OrdinalIgnoreCase).ToArray();
@@ -43,7 +42,6 @@ public sealed class OpenVinoModelRuntime(ModelLocations locations, ILogger<OpenV
         }
 
         _faceDetector = TryLoad("face_detector", locations.FaceDetection, 300, 300);
-        _faceReIdentifier = TryLoad("face_reid", locations.FaceReIdentification, 128, 128);
         if (!IsAvailable)
         {
             throw new InvalidOperationException("Không có OSNet body model nào tải thành công.");
@@ -73,39 +71,6 @@ public sealed class OpenVinoModelRuntime(ModelLocations locations, ILogger<OpenV
             }
 
             return result;
-        }
-        finally
-        {
-            _inferenceLock.Release();
-        }
-    }
-
-    public async Task<float[]?> ExtractFaceEmbeddingAsync(ImageFrame image, CancellationToken cancellationToken)
-    {
-        EnsureInitialized();
-        if (_faceDetector is null || _faceReIdentifier is null)
-        {
-            return null;
-        }
-
-        await _inferenceLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            var bestFace = DetectBestFace(image);
-            if (bestFace is null)
-            {
-                return null;
-            }
-
-            using var source = MatConversion.ToMat(image);
-            var faceBox = bestFace.Value;
-            using var face = new Mat(source, new Rect(faceBox.X1, faceBox.Y1, faceBox.Width, faceBox.Height));
-            return InferEmbedding(_faceReIdentifier, MatConversion.ToImageFrame(face));
-        }
-        catch (Exception exception)
-        {
-            OpenVinoRuntimeLog.InferenceFailed(logger, "face", exception);
-            return null;
         }
         finally
         {
@@ -146,7 +111,6 @@ public sealed class OpenVinoModelRuntime(ModelLocations locations, ILogger<OpenV
 
         _bodyModels.Clear();
         _faceDetector?.Dispose();
-        _faceReIdentifier?.Dispose();
         _core?.Dispose();
         _inferenceLock.Dispose();
         return ValueTask.CompletedTask;

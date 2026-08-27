@@ -26,11 +26,9 @@ public sealed class GeometryAndPolicyTests
     }
 
     [Fact]
-    public void IdentityPolicyCanRescueWithFaceOrAppearance()
+    public void IdentityPolicyCanRescueWithAppearance()
     {
-        var face = Score(0.65f, 0.64f, 0.63f) with { FaceScore = 0.80f, FaceMargin = 0.25f };
         var appearance = Score(0.75f, 0.72f, 0.72f) with { AppearanceScore = 0.90f, AppearanceMargin = 0.04f };
-        Assert.Equal(MatchSource.Face, IdentityDecisionPolicy.Decide(face, 0.68f, false).Source);
         Assert.Equal(MatchSource.BodyWithAppearance, IdentityDecisionPolicy.Decide(appearance, 0.68f, true).Source);
     }
 
@@ -109,13 +107,14 @@ public sealed class GeometryAndPolicyTests
             Match("Query_1", new BoundingBox(520, 0, 580, 100), 1.00f, "5:27 PM"),
             Match("Query_1", new BoundingBox(590, 0, 650, 100), 1.00f, null),
         };
-        var query = Query("Query_1", "12:16 PM", "12:17 PM", "12:04 PM", "12:04 PM");
+        var query = Query("Query_1", "12:16 PM", "12:17 PM", "12:04 PM", "12:04 PM", "9:00 AM");
 
         var result = MatchPostProcessor.Apply(matches,
             new Dictionary<string, QueryIdentity> { [query.Id] = query }, sourceTimestamp: "12:16 PM");
 
-        Assert.Equal(3, result.Count);
-        Assert.DoesNotContain(result, match => match.CardTimestamp is null or "12:16 PM" or "5:27 PM");
+        Assert.Equal(4, result.Count);
+        Assert.Contains(result, match => match.CardTimestamp is null);
+        Assert.DoesNotContain(result, match => match.CardTimestamp is "12:16 PM" or "5:27 PM");
         Assert.Single(result, match => match.CardTimestamp == "12:17 PM");
         Assert.Equal(2, result.Count(match => match.CardTimestamp == "12:04 PM"));
         Assert.DoesNotContain(result, match => match.BoundingBox.X1 is 170 or 310);

@@ -107,45 +107,38 @@ public sealed class QueryTests
     }
 
     [Fact]
-    public async Task MatchEngineRejectsBodyMatchWhenNoFaceIsDetected()
+    public async Task MatchEngineKeepsBodyMatchAndReportsBackFacingWhenNoFaceIsDetected()
     {
         var runtime = new FakeRuntime { HasVisibleFace = false };
         var catalog = new QueryCatalog();
-        catalog.Replace([new QueryIdentity("Query_12", [new ReferenceImage(
-            "reference", "Query_12", "reference.png",
-            new Dictionary<string, float[]> { ["model"] = [1, 0, 0] },
-            "7:42 AM", null, DateTimeOffset.UtcNow)], 0.65f)]);
+        catalog.Replace([new QueryIdentity("Query_12", References("Query_12", "7:42 AM"), 0.65f)]);
         var engine = new OpenVinoMatchEngine(runtime, new OpenCvImageCodec(), new SingleCandidateGenerator(),
             new OpenCvBoxRenderer(), new FakeOcr(), catalog, new UserSelectionState(),
             NullLogger<OpenVinoMatchEngine>.Instance);
 
         var matches = await engine.MatchAsync(ImagingTests.Gradient(60, 140), "Query_12", CancellationToken.None);
 
-        Assert.Empty(matches);
+        Assert.Single(matches);
         Assert.Equal(1, runtime.FaceDetectionCalls);
-        Assert.Equal(0, runtime.FaceEmbeddingCalls);
-        Assert.Contains("không phát hiện khuôn mặt", Assert.Single(engine.LastExplanations).Reason,
+        Assert.Contains("quay lưng", Assert.Single(engine.LastExplanations).Reason,
             StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task MatchEngineRejectsCardWhenTimestampCannotBeRead()
+    public async Task MatchEngineUsesBodyAiWhenTimestampCannotBeRead()
     {
         var runtime = new FakeRuntime();
         var catalog = new QueryCatalog();
-        catalog.Replace([new QueryIdentity("Query_4", [new ReferenceImage(
-            "reference", "Query_4", "reference.png",
-            new Dictionary<string, float[]> { ["model"] = [1, 0, 0] },
-            "12:17 PM", null, DateTimeOffset.UtcNow)], 0.65f)]);
+        catalog.Replace([new QueryIdentity("Query_4", References("Query_4", "12:17 PM"), 0.65f)]);
         var engine = new OpenVinoMatchEngine(runtime, new OpenCvImageCodec(), new SingleCandidateGenerator(),
             new OpenCvBoxRenderer(), new FakeOcr(null), catalog, new UserSelectionState(),
             NullLogger<OpenVinoMatchEngine>.Instance);
 
         var matches = await engine.MatchAsync(ImagingTests.Gradient(60, 140), "Query_4", CancellationToken.None);
 
-        Assert.Empty(matches);
-        Assert.Equal(0, runtime.BodyEmbeddingCalls);
-        Assert.Equal(0, runtime.FaceDetectionCalls);
+        Assert.Null(Assert.Single(matches).CardTimestamp);
+        Assert.Equal(1, runtime.BodyEmbeddingCalls);
+        Assert.Equal(1, runtime.FaceDetectionCalls);
         Assert.Contains("không đọc được timestamp", Assert.Single(engine.LastExplanations).Reason,
             StringComparison.OrdinalIgnoreCase);
     }
@@ -162,7 +155,6 @@ public sealed class QueryTests
         public bool HasVisibleFace { get; init; } = true;
         public int BodyEmbeddingCalls { get; private set; }
         public int FaceDetectionCalls { get; private set; }
-        public int FaceEmbeddingCalls { get; private set; }
         public bool IsAvailable => true;
         public IReadOnlyList<string> ActiveBodyModels => ["model"];
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -176,13 +168,18 @@ public sealed class QueryTests
             FaceDetectionCalls++;
             return Task.FromResult(HasVisibleFace);
         }
-        public Task<float[]?> ExtractFaceEmbeddingAsync(ImageFrame image, CancellationToken cancellationToken)
-        {
-            FaceEmbeddingCalls++;
-            return Task.FromResult<float[]?>(null);
-        }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
+
+    private static ReferenceImage[] References(string queryId, string timestamp) =>
+    [
+        new("reference-1", queryId, "reference-1.png",
+            new Dictionary<string, float[]> { ["model"] = [1, 0, 0] },
+            timestamp, null, DateTimeOffset.UtcNow),
+        new("reference-2", queryId, "reference-2.png",
+            new Dictionary<string, float[]> { ["model"] = [1, 0, 0] },
+            timestamp, null, DateTimeOffset.UtcNow),
+    ];
 
     private sealed class SingleCandidateGenerator : ICandidateGenerator
     {

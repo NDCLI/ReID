@@ -181,7 +181,31 @@ public sealed class OpenCvCandidateGenerator : ICandidateGenerator
         for (var row = 0; row < rowBands.Count; row++)
         {
             var columns = RowSegments(rowBands[row]);
-            if (columns.Count < 4) columns = ProjectedColumns();
+            var projected = ProjectedColumns();
+            if (columns.Count < 4)
+            {
+                columns = projected;
+            }
+            else if (pitches.Length > 0)
+            {
+                var regularColumns = columns
+                    .Where(column => column.Right - column.Left <= portraitMaximum)
+                    .ToArray();
+                var alignmentTolerance = Math.Max(6, cardWidth / 6);
+                var alignedColumns = regularColumns.Count(column => projected.Any(model =>
+                    Math.Abs((model.Left + model.Right - column.Left - column.Right) / 2) <= alignmentTolerance));
+                if (regularColumns.Length >= 3 && alignedColumns >= Math.Ceiling(regularColumns.Length * 0.75))
+                {
+                    foreach (var column in projected)
+                    {
+                        var center = column.Left + ((column.Right - column.Left) / 2);
+                        if (!columns.Any(existing => center >= existing.Left && center < existing.Right))
+                            columns.Add(column);
+                    }
+
+                    columns = columns.OrderBy(column => column.Left).ToList();
+                }
+            }
             foreach (var column in columns)
             {
                 result.Add(new CardCandidate(

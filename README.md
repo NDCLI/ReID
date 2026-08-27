@@ -67,7 +67,7 @@ Tạo Setup self-contained:
 
 ```powershell
 $env:Path = 'C:\Program Files\dotnet;' + $env:Path
-.\installer\Build-Setup.ps1 -Version 1.0.10
+.\installer\Build-Setup.ps1 -Version 1.0.12
 ```
 
 File tạo ra nằm tại `artifacts\setup\AutoMarkerReID-Setup-<version>-win-x64.exe`. Có thể truyền `-CertificateThumbprint` hoặc `-PfxPath` để ký Authenticode khi phát hành.
@@ -78,7 +78,7 @@ File tạo ra nằm tại `artifacts\setup\AutoMarkerReID-Setup-<version>-win-x6
 
 ```powershell
 $env:Path = 'C:\Program Files\dotnet;' + $env:Path
-.\store\Build-StoreMsix.ps1 -Version 1.0.7.0
+.\store\Build-StoreMsix.ps1 -Version 1.0.8.0
 ```
 
 File tải lên Partner Center nằm tại `artifacts\store\*.msixupload`. Pipeline dùng Windows SDK BuildTools chính thức từ NuGet nên không cần Visual Studio; Microsoft Store sẽ ký gói sau khi duyệt. Có thể build kiểm tra cấu trúc bằng `-TestIdentity`, nhưng tuyệt đối không tải gói test đó lên Store.

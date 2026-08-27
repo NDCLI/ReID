@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')]
-    [string]$Version = '1.0.7.0',
+    [string]$Version = '1.0.8.0',
     [string]$IdentityName = 'Hoakim.AutoMarkerReID',
     [string]$Publisher = 'CN=06970FBF-6DEA-4FD9-BB5E-DCC0D8D933EB',
     [string]$PublisherDisplayName = 'Hoakim',
@@ -69,6 +69,17 @@ try {
     [IO.File]::WriteAllText($manifestPath, $manifest, [Text.UTF8Encoding]::new($false))
 
     $semanticVersion = ($Version -split '\.')[0..2] -join '.'
+    $restoreArguments = @(
+        'restore', $projectPath,
+        '-p:Platform=x64',
+        '--runtime', 'win-x64',
+        '-p:StoreBuild=true',
+        "-p:StoreManifestPath=$manifestPath",
+        "-p:StoreAssetsPath=$assetsPath"
+    )
+    & dotnet @restoreArguments
+    if ($LASTEXITCODE -ne 0) { throw 'Store MSIX restore failed.' }
+
     $cleanArguments = @(
         'clean', $projectPath,
         '--configuration', 'Release',

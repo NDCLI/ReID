@@ -152,6 +152,15 @@ public sealed class ImagingTests
     }
 
     [Fact]
+    public void CandidateGeneratorProjectsAColumnWhenOneCardHeaderIsTooDarkToDetect()
+    {
+        var candidates = new OpenCvCandidateGenerator().Generate(GridWithOneFaintCard());
+
+        Assert.True(candidates.Count >= 10);
+        Assert.Contains(candidates, candidate => candidate.Row == 1 && candidate.BoundingBox.X1 == 388);
+    }
+
+    [Fact]
     public void ManualCardLookupFindsCardAtClickWithoutCandidatePrefilter()
     {
         var renderer = new OpenCvBoxRenderer();
@@ -250,6 +259,34 @@ public sealed class ImagingTests
         }
         Fill(180, 230, 230, 370, 72); // heading joined to the first card; recover that grid slot
         Fill(570, 230, 690, 370, 72); // unrelated wide row noise must not become a card
+        return new ImageFrame(width, height, width * 3, ImagePixelFormat.Bgr24, pixels);
+
+        void Fill(int x1, int y1, int x2, int y2, byte value)
+        {
+            for (var y = y1; y < y2; y++)
+            for (var x = x1; x < x2; x++)
+            {
+                var offset = (y * width + x) * 3;
+                pixels[offset] = value;
+                pixels[offset + 1] = value;
+                pixels[offset + 2] = value;
+            }
+        }
+    }
+
+    private static ImageFrame GridWithOneFaintCard()
+    {
+        const int width = 700;
+        const int height = 430;
+        var pixels = Enumerable.Repeat((byte)18, width * height * 3).ToArray();
+        foreach (var top in new[] { 50, 230 })
+        foreach (var left in new[] { 220, 304, 388, 472, 556 })
+        {
+            var faintHeader = top == 230 && left == 388;
+            Fill(left, top, left + 60, top + 160, faintHeader ? (byte)18 : (byte)72);
+            Fill(left + 5, top + (faintHeader ? 35 : 3), left + 55, top + 157, 165);
+        }
+
         return new ImageFrame(width, height, width * 3, ImagePixelFormat.Bgr24, pixels);
 
         void Fill(int x1, int y1, int x2, int y2, byte value)

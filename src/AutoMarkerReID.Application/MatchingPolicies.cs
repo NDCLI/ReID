@@ -9,8 +9,6 @@ public sealed record IdentityScore(
     float BestReferenceScore,
     IReadOnlyDictionary<string, string> ModelWinners,
     string? BestReferenceId,
-    float? FaceScore = null,
-    float? FaceMargin = null,
     float? AppearanceScore = null,
     float? AppearanceMargin = null);
 
@@ -32,11 +30,6 @@ public static class IdentityDecisionPolicy
         if (bodyAbsolute && strongReference && modelAgreement && margin >= ReIdDefaults.AiMatchMargin)
         {
             return new IdentityDecision(true, score.QueryId, MatchSource.Body, "body");
-        }
-
-        if (score.FaceScore >= ReIdDefaults.FaceMatchThreshold && score.FaceMargin >= ReIdDefaults.FaceMatchMargin)
-        {
-            return new IdentityDecision(true, score.QueryId, MatchSource.Face, "face rescue");
         }
 
         if (timestampMatched && modelAgreement && margin >= ReIdDefaults.AiMatchMargin &&
@@ -101,12 +94,16 @@ public static class MatchPostProcessor
                     group => Math.Max(0, group.Count() -
                         (string.Equals(group.Key, sourceTimestamp, StringComparison.OrdinalIgnoreCase) ? 1 : 0)),
                     StringComparer.OrdinalIgnoreCase);
-            filtered = filtered
+            var timestamped = filtered
                 .Where(match => match.CardTimestamp is not null && timestampLimits.ContainsKey(match.CardTimestamp))
                 .GroupBy(match => match.CardTimestamp!, StringComparer.OrdinalIgnoreCase)
                 .SelectMany(group => group
                     .OrderByDescending(match => match.Score)
-                    .Take(timestampLimits[group.Key]))
+                    .Take(timestampLimits[group.Key]));
+            filtered = timestamped
+                .Concat(filtered.Where(match => match.CardTimestamp is null))
+                .OrderByDescending(match => match.Score)
+                .Take(query.MatchLimit)
                 .OrderBy(match => match.BoundingBox.CenterY)
                 .ThenBy(match => match.BoundingBox.X1)
                 .ToList();

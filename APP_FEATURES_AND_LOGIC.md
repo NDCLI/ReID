@@ -8,7 +8,7 @@ AutoMarker Re-ID là ứng dụng desktop Windows chạy cục bộ, dùng để
 
 - Theo dõi ảnh mới trong Clipboard.
 - Nhận biết ảnh chụp đúng giao diện tìm kiếm Re-ID.
-- Tìm các thẻ kết quả cùng người bằng OpenCV, ensemble OSNet/OpenVINO, OCR thời gian và nhánh nhận diện khuôn mặt tùy chọn.
+- Tìm các thẻ kết quả cùng người bằng OpenCV, ensemble OSNet/OpenVINO và OCR thời gian; detector mặt chỉ ghi nhận hướng nhìn, không tham gia quyết định identity.
 - Vẽ khung quanh các thẻ đã nhận diện.
 - Cho người dùng duyệt, thêm/xóa khung, cắt/ghép ảnh, lưu kết quả và copy lại vào Clipboard.
 - Thu thập crop người vào thư mục `Query_N` do người dùng chọn.
@@ -34,7 +34,7 @@ flowchart TD
     J --> K["Cập nhật matcher trong RAM"]
     K --> E
     H -- "Có" --> L["Fast Grid hoặc fallback scan"]
-    L --> M["Ensemble OSNet, OCR, Face, LBP tùy chọn"]
+    L --> M["Ensemble OSNet, OCR, LBP tùy chọn và hướng nhìn"]
     M --> N["Lọc, giới hạn và snap khung"]
     N --> O["Mở Review kể cả khi có 0 khung"]
     O --> P{"Người dùng lưu?"}
@@ -151,7 +151,7 @@ Sau khi đọc được ảnh, app chia thành hai nhánh:
 - Model thiếu hoặc lỗi được bỏ qua riêng lẻ; app tiếp tục bằng các model body còn hoạt động.
 - Mỗi crop được resize theo input tĩnh của model, chuyển `float32` BGR, infer có lock riêng và L2-normalize embedding.
 - Similarity là dot product/cosine của embedding đã normalize; ensemble là trung bình có trọng số.
-- Nhánh face tùy chọn dùng `face-detection-retail-0005` và `face-reidentification-retail-0095` để cứu trường hợp body Re-ID không chắc chắn, đặc biệt khi trang phục thay đổi.
+- `face-detection-retail-0005` chỉ ghi chẩn đoán “thấy mặt” hoặc “quay lưng/nghiêng”; kết quả này không nhận diện người và không được phép nhận/loại body match.
 - LBP trang phục là tín hiệu tie-break tùy chọn, không phải model nhận diện chính và không được trộn vào body score.
 
 ### 3.8. Review kết quả
@@ -246,31 +246,21 @@ Hiện `QUERY_IMAGE_PREFIXES = ()`, vì vậy tất cả ảnh hợp lệ trong 
 
 Fast Grid là đường tăng tốc mặc định khi nhận ra bố cục lưới:
 
-1. Tìm tối đa ba dải hàng có đủ pixel ảnh.
+1. Tìm tối đa hai dải hàng có đủ pixel ảnh.
 2. Dò biên thẻ theo projection cột sáng, xây model chiều rộng và khoảng cách lặp lại. Cần tối thiểu bốn segment thẻ dọc để xác nhận lưới.
-3. Xem thẻ đầu tiên là source/query card và bỏ khỏi danh sách kết quả.
-4. OCR từng thẻ để thu hẹp reference theo timestamp khi có thể.
-5. Chạy model sơ tuyển `osnet_lct_0277`:
-   - Score từ `0.45` trở lên vào shortlist.
-   - Nếu OCR không đọc được, score từ `0.35` trở lên có thể vào fallback shortlist, tối đa 5 thẻ.
-6. Chỉ các thẻ shortlist mới chạy phần model body còn lại và face.
-7. Dùng chính sách open-set chung để chấp nhận hoặc từ chối.
-8. Nếu Fast Grid không thực hiện được hoặc trả danh sách rỗng, app **không kết luận là không có match** mà chuyển sang full/fallback scan.
-
-Ở chế độ Root, app thử nhận Query từ source card bằng AI trước để chỉ scan một identity. Nếu bước này thất bại, app tiếp tục bằng logic scope/fallback khác.
+3. Khi một header card quá tối nhưng nhịp lưới đủ tin cậy, chiếu lại cột còn thiếu theo width/pitch của hàng chuẩn.
+4. Xem thẻ đầu tiên là source/query card và bỏ khỏi danh sách kết quả.
+5. OCR từng thẻ: timestamp đọc được chỉ so với bucket tương ứng; OCR không đọc được dùng toàn bộ reference.
+6. Chạy toàn bộ body ensemble và chính sách open-set trên từng candidate.
+7. Detector mặt chỉ ghi hướng “thấy mặt” hoặc “quay lưng/nghiêng”, không thay đổi quyết định.
+8. Nếu không xác nhận được lưới đều, chuyển sang contour fallback.
 
 ### 4.3. Full/fallback scan
 
-- Nếu nhận ra lưới nhưng Fast Grid không cho kết quả, app dùng toàn bộ card trừ source làm candidate, không bắt buộc qua pixel-template gate.
-- Nếu không nhận ra lưới:
-  - Template-match từng reference ở scale `0.9, 0.95, 1.0, 1.05, 1.1`.
-  - Ngưỡng pixel tự động là `0.86`.
-  - Chỉ lấy local maxima.
-  - Bỏ candidate nằm trong 25% panel trái; không cắt phần đáy để hàng cuối vẫn được quét.
-  - NMS với IoU `0.30`.
-  - Giới hạn tối đa 150 candidate mạnh nhất.
-- Khi Root có nhiều Query, app thử template-match source card để scope một Query với score tối thiểu `0.5`; nếu không xác định được thì scan tất cả.
-- Candidate được phân loại song song bằng `ThreadPoolExecutor`. Lỗi ở một candidate chỉ làm candidate đó bị bỏ, không làm dừng cả ảnh.
+- Khi không nhận ra lưới, app dùng Canny + morphology + contour để tìm card dọc.
+- Bỏ candidate nằm trong 25% panel trái, áp NMS với IoU `0.30` và giới hạn tối đa 150 candidate.
+- Contour rộng bất thường bị loại; vị trí đầu hàng bị dính contour có thể được khôi phục theo median width/pitch.
+- Lỗi ở một candidate chỉ làm candidate đó bị bỏ và được ghi vào chẩn đoán, không làm dừng cả ảnh.
 
 ### 4.4. Chính sách open-set của body Re-ID
 
@@ -285,7 +275,7 @@ Với mỗi candidate:
    - `top1 - top2 >= 0.06`.
    - `best_reference_score >= 0.62`, trừ trường hợp timestamp chính xác xác nhận reference.
    - Khi có từ hai model, không model nào chọn identity khác winner ensemble.
-6. Nếu body không đủ chắc chắn, face result có thể thay thế khi score face `>= 0.65` và margin face `>= 0.20`.
+6. Face không được dùng để cứu hoặc loại identity; nó chỉ ghi hướng nhìn sau khi body match đã đạt.
 
 Nhánh “body gần ngưỡng + exact timestamp rescue” có code và test, nhưng các call runtime hiện đều truyền `allow_time_rescue=False`; do đó nhánh rescue này chưa chạy trong ứng dụng.
 
@@ -304,7 +294,7 @@ LBP mặc định tắt và chỉ được dùng để phá tie top-1/top-2, kh�
   - LBP cũng chọn đúng winner đó.
   - LBP score `>= 0.75` và cách hạng nhì `>= 0.02`.
 - LBP không thay đổi body score, chỉ thêm bằng chứng để chấp nhận một tie an toàn.
-- Nếu face đủ mạnh thì face có ưu tiên hơn LBP.
+- Face không có quyền ưu tiên hơn body hoặc LBP.
 
 ### 4.6. OCR timestamp
 
@@ -321,7 +311,8 @@ LBP mặc định tắt và chỉ được dùng để phá tie top-1/top-2, kh�
 - Sau AI:
   - Timestamp thẻ phải khớp timestamp của đúng reference thắng về thị giác.
   - Timestamp cũng phải tồn tại trong tập timestamp của Query.
-  - Timestamp chỉ là điều kiện xác nhận identity, không giới hạn số card được vẽ.
+  - Mỗi timestamp có quota bằng số reference trong bucket đó; source chỉ trừ một slot khi dùng cùng timestamp.
+  - Card OCR không đọc được vẫn được giữ nếu AI đạt, sau đó chịu giới hạn tổng `reference_count - 1`.
 - OCR toàn screenshot và early folder filtering hiện đang bị comment tắt để tiết kiệm thời gian; logic thực tế dùng OCR theo từng card.
 
 ### 4.7. Hậu xử lý và vẽ khung
@@ -329,7 +320,7 @@ LBP mặc định tắt và chỉ được dùng để phá tie top-1/top-2, kh�
 Sau khi phân loại:
 
 1. Nếu có nhiều Query, chỉ giữ Query có nhiều box nhất; hòa số lượng thì Query có tổng score lớn hơn thắng.
-2. Giữ tối đa ba hàng kết quả đang hiển thị.
+2. Giữ tối đa hai hàng kết quả đang hiển thị.
 3. Xóa match overlap source card với IoU lớn hơn `0.30`.
 4. Loại contour rộng quá `1.5×` median card của hàng; nếu contour rộng che vị trí card đầu hàng thì khôi phục card theo median nhịp lưới.
 5. Với kết quả tự động, giới hạn số box bằng `số reference - 1`; thao tác thêm/xóa thủ công trong Review/Library không bị giới hạn này.
@@ -366,7 +357,7 @@ output/
 ├── reid_0277.xml / .bin
 ├── reid_0286.xml / .bin
 ├── face-detection-retail-0005.xml / .bin
-└── face-reidentification-retail-0095.xml / .bin
+└── face-reidentification-retail-0095.xml / .bin  # legacy, runtime không nạp
 ```
 
 Trong bản portable, `queries/` và `output/` nằm cạnh EXE để có thể ghi và mang theo; tài nguyên đóng gói nằm trong thư mục runtime `_internal`/`_MEIPASS`.
@@ -421,11 +412,11 @@ Tên component dưới đây chỉ mô tả trách nhiệm; đội phát triển
 | Query Repository | CRUD Query, sắp xếp tự nhiên, đếm ảnh, chọn phạm vi nhận diện và Query đích |
 | Query Collector | Validate crop người, chống trùng, lưu reference mới và cập nhật index đang chạy |
 | Feature Cache | Đọc/ghi embedding và OCR cache, kiểm tra phiên bản/mtime, dọn cache mồ côi |
-| Model Runtime | Nạp và chạy body ensemble cùng face model tùy chọn, quản lý thread safety |
+| Model Runtime | Nạp và chạy body ensemble; detector mặt chỉ phân loại hướng nhìn, quản lý thread safety |
 | OCR Service | Đọc timestamp thẻ, chuẩn hóa, consensus, fallback và so khớp thời gian |
-| Candidate Generator | Fast Grid, template fallback, vùng bỏ qua, NMS và cap candidate |
-| Identity Classifier | Tính identity score, margin, model agreement, face/LBP rescue và open-set rejection |
-| Match Post-processor | Single-query rule, source removal, giữ ba hàng, căn hàng và tách box liền nhau |
+| Candidate Generator | Fast Grid, khôi phục cột tối, contour fallback, vùng bỏ qua, NMS và cap candidate |
+| Identity Classifier | Tính identity score, margin, model agreement, LBP rescue và open-set rejection |
+| Match Post-processor | Single-query rule, source removal, giữ hai hàng, quota timestamp, căn hàng và tách box liền nhau |
 | Box Geometry Service | Snap thẻ, thêm/xóa box theo click và vẽ border |
 | Review Controller | Quản lý bản nháp match, chỉnh tay, lưu/hủy và chặn monitor trong lúc review |
 | Result Repository | Lưu marked/original/metadata, load/update an toàn và liệt kê thư viện |
@@ -439,16 +430,12 @@ Tên component dưới đây chỉ mô tả trách nhiệm; đội phát triển
 | `POLL_INTERVAL` | `0.1 s` | Chu kỳ poll Clipboard |
 | `CLIPBOARD_IMAGE_READY_TIMEOUT_SECONDS` | `5.0 s` | Cửa sổ retry payload ShareX |
 | `REID_INTERFACE_MATCH_THRESHOLD` | `0.70` | Gate nhận diện giao diện bằng `ui_template.png` |
-| `AUTO_PIXEL_THRESHOLD` | `0.86` | Pixel threshold ở fallback scan |
 | `AI_MATCH_THRESHOLD` | `0.68` | Body threshold chung khi chưa calibration |
 | `AI_MATCH_MARGIN` | `0.06` | Khoảng cách tối thiểu top-1/top-2 |
 | `AI_BEST_REFERENCE_THRESHOLD` | `0.62` | Bằng chứng tối thiểu từ một reference mạnh |
 | `AI_TOP_K_REFERENCES` | `2` | Số reference tốt nhất để tính identity score |
 | `FACE_DETECTION_THRESHOLD` | `0.75` | Ngưỡng detect mặt |
-| `FACE_MATCH_THRESHOLD` | `0.65` | Ngưỡng nhận dạng mặt |
-| `FACE_MATCH_MARGIN` | `0.20` | Margin identity của nhánh face |
 | `OCR_TIMESTAMP_TOLERANCE` | `0 phút` | So chính xác HH:MM |
-| `FAST_ROOT_SHORTLIST_THRESHOLD` | `0.45` | Sàn shortlist Fast Grid |
 | `FAST_ROOT_MAX_ROWS` | `2` | Số hàng lưới tối đa |
 | `MAX_PIXEL_CANDIDATES` | `150` | Cap candidate fallback |
 | `IGNORE_LEFT_RATIO` | `0.25` | Bỏ panel trái |
@@ -468,7 +455,7 @@ Các hành vi sau là logic của ứng dụng hiện tại và cần được g
 
 1. Thu thập Clipboard **luôn lưu vào Query do người dùng chọn**, không tự phân người sang Query khác.
 2. Không có tính năng Batch trong luồng chính.
-3. Fast Grid chỉ dùng ensemble OSNet-family và face tùy chọn; không phụ thuộc TransReID.
+3. Identity chỉ dùng ensemble OSNet-family và LBP tùy chọn; Face chỉ ghi hướng nhìn, không phụ thuộc TransReID.
 4. Khung được snap theo biên ngoài của card, không inset vào vùng ảnh camera.
 5. OCR toàn screenshot không tham gia quyết định; OCR theo từng card mới là gate thực tế.
 6. Near-threshold timestamp rescue chưa được bật trong luồng runtime.
@@ -544,7 +531,7 @@ Match {
   pixelScore: float | null,
   modelScores: map<ModelName, float>,
   cardTimestamp: string | null,
-  source: "body" | "face" | "body+appearance" | "manual",
+  source: "body" | "body+appearance" | "manual" (`face` chỉ còn để tương thích metadata cũ),
   manuallyEdited: bool
 }
 ```
@@ -607,7 +594,7 @@ Metadata phải được ghi atomic. Nếu không ghi đủ ảnh original, ản
 - Timestamp đọc được nhưng sai reference phải loại candidate.
 - Timestamp không đọc được không tự động làm candidate thất bại.
 - Chỉ một Query chiếm ưu thế được giữ lại.
-- Giữ tối đa ba hàng kết quả; chỉ kết quả tự động bị cap theo `reference_count - 1`, khung thủ công được thêm tự do.
+- Giữ tối đa hai hàng kết quả; chỉ kết quả tự động bị cap theo `reference_count - 1`, khung thủ công được thêm tự do.
 - Source card không được vẽ khung.
 
 ### 13.4. Review và persistence
