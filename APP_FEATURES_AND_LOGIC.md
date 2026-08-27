@@ -125,7 +125,8 @@ Sau khi đọc được ảnh, app chia thành hai nhánh:
 ### 3.6. Quản lý Query
 
 - Tất cả Query nằm dưới `queries/Query_N/`.
-- Chọn Root sẽ nhận diện trên toàn bộ Query; chọn một folder sẽ chỉ nhận diện người trong folder đó.
+- Chọn Root sẽ nhận diện card nguồn bằng toàn bộ Query rồi chỉ vẽ người cùng identity với nguồn.
+- Chọn một folder chỉ cho phép vẽ người trong folder đó, nhưng vẫn dùng các Query khác làm đối chứng âm để tính top-2/margin và tránh nhận chéo.
 - Chuyển Query chỉ đổi view `reference_images`/`query_images` trong RAM, không compile lại OpenVINO hay đọc lại toàn bộ ảnh.
 - Thu thập Query qua Clipboard luôn bật và không có công tắc tắt trong UI.
 - Crop mới bắt buộc có Query đích hợp lệ từ `Query_1` đến `Query_999`.
@@ -264,6 +265,8 @@ Fast Grid là đường tăng tốc mặc định khi nhận ra bố cục lư�
 
 ### 4.4. Chính sách open-set của body Re-ID
 
+Trước khi xử lý candidate, nếu đang chọn Root và có card nguồn, engine nhận dạng card nguồn bằng toàn bộ Query. Nếu nguồn không vượt qua score, margin, best-reference và đồng thuận model thì dừng thay vì tự chọn Query theo số lượng kết quả.
+
 Với mỗi candidate:
 
 1. Trích xuất embedding từ các model body còn hoạt động.
@@ -319,7 +322,7 @@ LBP mặc định tắt và chỉ được dùng để phá tie top-1/top-2, kh�
 
 Sau khi phân loại:
 
-1. Nếu có nhiều Query, chỉ giữ Query có nhiều box nhất; hòa số lượng thì Query có tổng score lớn hơn thắng.
+1. Root có card nguồn chỉ giữ Query đã nhận dạng từ nguồn; phạm vi đích danh chỉ giữ Query được chọn. Nếu detector không tìm thấy card nguồn và có nhiều Query, mới fallback sang Query có nhiều box nhất; hòa số lượng thì tổng score lớn hơn thắng.
 2. Giữ tối đa hai hàng kết quả đang hiển thị.
 3. Xóa match overlap source card với IoU lớn hơn `0.30`.
 4. Loại contour rộng quá `1.5×` median card của hàng; nếu contour rộng che vị trí card đầu hàng thì khôi phục card theo median nhịp lưới.

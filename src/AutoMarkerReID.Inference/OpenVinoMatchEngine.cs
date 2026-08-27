@@ -31,11 +31,7 @@ public sealed class OpenVinoMatchEngine(
         var explanations = new List<RecognitionExplanation>();
         Volatile.Write(ref _lastExplanations, []);
         var queries = catalog.Snapshot;
-        var scopedQueries = queryScope is null
-            ? queries
-            : queries.Where(item => item.Key.Equals(queryScope, StringComparison.OrdinalIgnoreCase))
-                .ToDictionary(item => item.Key, item => item.Value, StringComparer.OrdinalIgnoreCase);
-        if (scopedQueries.Count == 0)
+        if (queries.Count == 0 || queryScope is not null && !queries.ContainsKey(queryScope))
         {
             return [];
         }
@@ -49,10 +45,48 @@ public sealed class OpenVinoMatchEngine(
 
         var source = candidates.FirstOrDefault(candidate => candidate.IsSource);
         string? sourceTimestamp = null;
+        var requiredQueryId = queryScope;
         if (source is not null)
         {
             var sourceCrop = codec.Crop(screenshot, source.BoundingBox);
             sourceTimestamp = await ocr.ReadTimestampAsync(sourceCrop, cancellationToken).ConfigureAwait(false);
+            if (queryScope is null)
+            {
+                var sourceEmbeddings = await runtime.ExtractBodyEmbeddingsAsync(sourceCrop, cancellationToken).ConfigureAwait(false);
+                var sourceEvaluations = queries.Values
+                    .Select(query => EvaluateQuery(query, sourceEmbeddings, sourceTimestamp))
+                    .Where(evaluation => evaluation is not null)
+                    .Cast<QueryEvaluation>()
+                    .OrderByDescending(evaluation => evaluation.EnsembleScore)
+                    .ToList();
+                if (sourceEvaluations.Count == 0)
+                {
+                    explanations.Add(new RecognitionExplanation(source.BoundingBox, null, 0, 0, null, null,
+                        false, "Không xác định được Query của card nguồn.", new Dictionary<string, float>()));
+                    Volatile.Write(ref _lastExplanations, explanations);
+                    return [];
+                }
+
+                var sourceWinner = sourceEvaluations[0];
+                var sourceScore = CreateIdentityScore(sourceEvaluations, sourceEmbeddings.Keys);
+                var sourceThreshold = selection.MatchThresholdOverride ?? sourceWinner.Query.CalibratedThreshold;
+                var sourceTimestampMatched = sourceTimestamp is not null &&
+                                             string.Equals(sourceTimestamp, sourceWinner.BestReference?.Timestamp, StringComparison.OrdinalIgnoreCase);
+                var sourceDecision = IdentityDecisionPolicy.Decide(sourceScore, sourceThreshold, false, sourceTimestampMatched);
+                if (!sourceDecision.Accepted)
+                {
+                    explanations.Add(new RecognitionExplanation(source.BoundingBox, sourceWinner.Query.Id,
+                        sourceWinner.EnsembleScore, sourceThreshold,
+                        sourceWinner.EnsembleScore - (sourceEvaluations.Count > 1 ? sourceEvaluations[1].EnsembleScore : 0),
+                        sourceWinner.BestReferenceScore, false,
+                        "Không xác định chắc chắn Query của card nguồn: " + ExplainDecision(sourceDecision, sourceScore, sourceThreshold),
+                        sourceWinner.ModelScores));
+                    Volatile.Write(ref _lastExplanations, explanations);
+                    return [];
+                }
+
+                requiredQueryId = sourceWinner.Query.Id;
+            }
         }
 
         var accepted = new List<MatchResult>();
@@ -72,7 +106,7 @@ public sealed class OpenVinoMatchEngine(
                     continue;
                 }
 
-                var evaluations = scopedQueries.Values
+                var evaluations = queries.Values
                     .Select(query => EvaluateQuery(query, embeddings, timestamp))
                     .Where(evaluation => evaluation is not null)
                     .Cast<QueryEvaluation>()
@@ -87,13 +121,6 @@ public sealed class OpenVinoMatchEngine(
                 }
 
                 var winner = evaluations[0];
-                var runnerUp = evaluations.Count > 1 ? evaluations[1].EnsembleScore : 0;
-                var modelWinners = embeddings.Keys.ToDictionary(
-                    model => model,
-                    model => evaluations.OrderByDescending(evaluation => evaluation.ModelScores.GetValueOrDefault(model)).First().Query.Id,
-                    StringComparer.OrdinalIgnoreCase);
-
-                var bodyMargin = winner.EnsembleScore - runnerUp;
                 float? appearanceScore = null;
                 float? appearanceMargin = null;
                 if (selection.AppearanceEnabled)
@@ -110,16 +137,17 @@ public sealed class OpenVinoMatchEngine(
                     }
                 }
 
-                var score = new IdentityScore(
-                    winner.Query.Id,
-                    winner.EnsembleScore,
-                    runnerUp,
-                    winner.BestReferenceScore,
-                    modelWinners,
-                    winner.BestReference?.Id,
-                    appearanceScore,
-                    appearanceMargin);
+                var score = CreateIdentityScore(evaluations, embeddings.Keys, appearanceScore, appearanceMargin);
+                var bodyMargin = score.EnsembleScore - score.RunnerUpScore;
                 var threshold = selection.MatchThresholdOverride ?? winner.Query.CalibratedThreshold;
+                if (requiredQueryId is not null &&
+                    !string.Equals(winner.Query.Id, requiredQueryId, StringComparison.OrdinalIgnoreCase))
+                {
+                    explanations.Add(new RecognitionExplanation(candidate.BoundingBox, winner.Query.Id,
+                        winner.EnsembleScore, threshold, bodyMargin, winner.BestReferenceScore,
+                        false, $"Bị loại: {winner.Query.Id} thắng nhưng phạm vi yêu cầu {requiredQueryId}.", winner.ModelScores));
+                    continue;
+                }
                 var timestampMatched = timestamp is not null &&
                                        string.Equals(timestamp, winner.BestReference?.Timestamp, StringComparison.OrdinalIgnoreCase);
                 var decision = IdentityDecisionPolicy.Decide(score, threshold, selection.AppearanceEnabled, timestampMatched);
@@ -172,7 +200,7 @@ public sealed class OpenVinoMatchEngine(
             }
         }
 
-        var postProcessed = MatchPostProcessor.Apply(accepted, scopedQueries, source?.BoundingBox, sourceTimestamp);
+        var postProcessed = MatchPostProcessor.Apply(accepted, queries, source?.BoundingBox, sourceTimestamp);
         var retainedBoxes = postProcessed.Select(match => match.BoundingBox).ToHashSet();
         var finalExplanations = explanations.Select(item =>
             item.Accepted && !retainedBoxes.Contains(boxRenderer.SnapToCard(screenshot, item.BoundingBox))
@@ -180,6 +208,29 @@ public sealed class OpenVinoMatchEngine(
                 : item).ToArray();
         Volatile.Write(ref _lastExplanations, finalExplanations);
         return postProcessed;
+    }
+
+    private static IdentityScore CreateIdentityScore(
+        IReadOnlyList<QueryEvaluation> evaluations,
+        IEnumerable<string> modelNames,
+        float? appearanceScore = null,
+        float? appearanceMargin = null)
+    {
+        var winner = evaluations[0];
+        var runnerUp = evaluations.Count > 1 ? evaluations[1].EnsembleScore : 0;
+        var modelWinners = modelNames.ToDictionary(
+            model => model,
+            model => evaluations.OrderByDescending(evaluation => evaluation.ModelScores.GetValueOrDefault(model)).First().Query.Id,
+            StringComparer.OrdinalIgnoreCase);
+        return new IdentityScore(
+            winner.Query.Id,
+            winner.EnsembleScore,
+            runnerUp,
+            winner.BestReferenceScore,
+            modelWinners,
+            winner.BestReference?.Id,
+            appearanceScore,
+            appearanceMargin);
     }
 
     private static string ExplainDecision(IdentityDecision decision, IdentityScore score, float threshold)

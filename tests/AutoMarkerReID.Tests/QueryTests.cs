@@ -143,6 +143,44 @@ public sealed class QueryTests
             StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task MatchEngineUsesOtherQueriesAsNegativesWhenScopeIsSelected()
+    {
+        var runtime = new FakeRuntime { BodyEmbedding = [0.8f, 0.6f, 0] };
+        var catalog = new QueryCatalog();
+        catalog.Replace([
+            new QueryIdentity("Query_11", References("Query_11", "7:42 AM", [1, 0, 0]), 0.65f),
+            new QueryIdentity("Query_12", References("Query_12", "7:42 AM", [0.8f, 0.6f, 0]), 0.65f),
+        ]);
+        var engine = new OpenVinoMatchEngine(runtime, new OpenCvImageCodec(), new SingleCandidateGenerator(),
+            new OpenCvBoxRenderer(), new FakeOcr(), catalog, new UserSelectionState(),
+            NullLogger<OpenVinoMatchEngine>.Instance);
+
+        var matches = await engine.MatchAsync(ImagingTests.Gradient(60, 140), "Query_11", CancellationToken.None);
+
+        Assert.Empty(matches);
+        Assert.Contains("Query_12 thắng", Assert.Single(engine.LastExplanations).Reason,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task MatchEngineUsesSourceIdentityInsteadOfCandidateMajorityInRootScope()
+    {
+        var runtime = new PixelRuntime();
+        var catalog = new QueryCatalog();
+        catalog.Replace([
+            new QueryIdentity("Query_11", References("Query_11", "7:42 AM", [1, 0, 0]), 0.65f),
+            new QueryIdentity("Query_12", References("Query_12", "7:42 AM", [0, 1, 0]), 0.65f),
+        ]);
+        var engine = new OpenVinoMatchEngine(runtime, new OpenCvImageCodec(), new SourceAndCandidatesGenerator(),
+            new OpenCvBoxRenderer(), new FakeOcr(), catalog, new UserSelectionState(),
+            NullLogger<OpenVinoMatchEngine>.Instance);
+
+        var matches = await engine.MatchAsync(ImagingTests.Gradient(240, 140), null, CancellationToken.None);
+
+        Assert.Equal("Query_12", Assert.Single(matches).QueryId);
+    }
+
     private static string CreateRoot()
     {
         var path = Path.Combine(Path.GetTempPath(), $"automarker-queries-{Guid.NewGuid():N}");
@@ -153,6 +191,7 @@ public sealed class QueryTests
     private sealed class FakeRuntime : IModelRuntime
     {
         public bool HasVisibleFace { get; init; } = true;
+        public float[] BodyEmbedding { get; init; } = [1, 0, 0];
         public int BodyEmbeddingCalls { get; private set; }
         public int FaceDetectionCalls { get; private set; }
         public bool IsAvailable => true;
@@ -161,7 +200,7 @@ public sealed class QueryTests
         public Task<IReadOnlyDictionary<string, float[]>> ExtractBodyEmbeddingsAsync(ImageFrame image, CancellationToken cancellationToken)
         {
             BodyEmbeddingCalls++;
-            return Task.FromResult<IReadOnlyDictionary<string, float[]>>(new Dictionary<string, float[]> { ["model"] = [1, 0, 0] });
+            return Task.FromResult<IReadOnlyDictionary<string, float[]>>(new Dictionary<string, float[]> { ["model"] = BodyEmbedding });
         }
         public Task<bool> HasVisibleFaceAsync(ImageFrame image, CancellationToken cancellationToken)
         {
@@ -172,12 +211,15 @@ public sealed class QueryTests
     }
 
     private static ReferenceImage[] References(string queryId, string timestamp) =>
+        References(queryId, timestamp, [1, 0, 0]);
+
+    private static ReferenceImage[] References(string queryId, string timestamp, float[] embedding) =>
     [
         new("reference-1", queryId, "reference-1.png",
-            new Dictionary<string, float[]> { ["model"] = [1, 0, 0] },
+            new Dictionary<string, float[]> { ["model"] = embedding },
             timestamp, null, DateTimeOffset.UtcNow),
         new("reference-2", queryId, "reference-2.png",
-            new Dictionary<string, float[]> { ["model"] = [1, 0, 0] },
+            new Dictionary<string, float[]> { ["model"] = embedding },
             timestamp, null, DateTimeOffset.UtcNow),
     ];
 
@@ -185,6 +227,31 @@ public sealed class QueryTests
     {
         public IReadOnlyList<CardCandidate> Generate(ImageFrame screenshot) =>
             [new(new BoundingBox(0, 0, screenshot.Width, screenshot.Height), 1, 0)];
+    }
+
+    private sealed class SourceAndCandidatesGenerator : ICandidateGenerator
+    {
+        public IReadOnlyList<CardCandidate> Generate(ImageFrame screenshot) =>
+        [
+            new(new BoundingBox(0, 0, 60, screenshot.Height), 1, 0, true),
+            new(new BoundingBox(60, 0, 120, screenshot.Height), 1, 0),
+            new(new BoundingBox(120, 0, 180, screenshot.Height), 1, 0),
+            new(new BoundingBox(180, 0, 240, screenshot.Height), 1, 0),
+        ];
+    }
+
+    private sealed class PixelRuntime : IModelRuntime
+    {
+        public bool IsAvailable => true;
+        public IReadOnlyList<string> ActiveBodyModels => ["model"];
+        public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<IReadOnlyDictionary<string, float[]>> ExtractBodyEmbeddingsAsync(ImageFrame image, CancellationToken cancellationToken)
+        {
+            var embedding = image.Pixels[0] is 164 or 72 ? new float[] { 1, 0, 0 } : [0, 1, 0];
+            return Task.FromResult<IReadOnlyDictionary<string, float[]>>(new Dictionary<string, float[]> { ["model"] = embedding });
+        }
+        public Task<bool> HasVisibleFaceAsync(ImageFrame image, CancellationToken cancellationToken) => Task.FromResult(true);
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class FakeOcr(string? timestamp = "7:42 AM") : IOcrService
