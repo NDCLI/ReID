@@ -10,7 +10,7 @@
 ```powershell
 $env:Path = 'C:\Program Files\dotnet;' + $env:Path
 .\store\Build-StoreMsix.ps1 `
-  -Version 1.0.8.0
+  -Version 1.0.15.0
 ```
 
 Script đã lưu Product identity chính thức `Hoakim.AutoMarkerReID`, publisher `CN=06970FBF-6DEA-4FD9-BB5E-DCC0D8D933EB` và PublisherDisplayName `Hoakim`.

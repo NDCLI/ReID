@@ -22,6 +22,8 @@ public sealed class ObservableLogStore
         if (exception is not null)
         {
             details += $" — {exception.Message}";
+            var rootCause = exception.GetBaseException();
+            if (!ReferenceEquals(rootCause, exception)) details += $" → {rootCause.Message}";
         }
 
         var entry = new ObservableLogEntry(DateTimeOffset.Now, level, shortCategory, details);

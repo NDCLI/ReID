@@ -134,7 +134,10 @@ public sealed class ApplicationController : BackgroundService
         catch (Exception exception)
         {
             ApplicationControllerLog.EngineStopped(_logger, exception);
-            SetState(AppRuntimeState.Error, exception.Message);
+            var rootCause = exception.GetBaseException();
+            SetState(AppRuntimeState.Error, ReferenceEquals(rootCause, exception)
+                ? exception.Message
+                : $"{exception.Message} — {rootCause.Message}");
         }
     }
 

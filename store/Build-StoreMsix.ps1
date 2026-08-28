@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')]
-    [string]$Version = '1.0.8.0',
+    [string]$Version = '1.0.15.0',
     [string]$IdentityName = 'Hoakim.AutoMarkerReID',
     [string]$Publisher = 'CN=06970FBF-6DEA-4FD9-BB5E-DCC0D8D933EB',
     [string]$PublisherDisplayName = 'Hoakim',

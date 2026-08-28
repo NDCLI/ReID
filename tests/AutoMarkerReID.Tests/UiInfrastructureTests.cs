@@ -23,6 +23,21 @@ public sealed class UiInfrastructureTests
     }
 
     [Fact]
+    public void ObservableLogStoreIncludesRootCauseMessage()
+    {
+        var store = new ObservableLogStore();
+        using var provider = new ObservableLogProvider(store);
+        var logger = provider.CreateLogger("Tests.Startup");
+        var exception = new TypeInitializationException("OpenVinoSharp.Core", new DllNotFoundException("MSVCP140.dll"));
+
+        logger.Log(LogLevel.Error, new EventId(2), "Không thể khởi động OpenVINO.", exception,
+            static (message, _) => message);
+
+        Assert.Contains("OpenVinoSharp.Core", store.Snapshot[0].Message, StringComparison.Ordinal);
+        Assert.Contains("MSVCP140.dll", store.Snapshot[0].Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void UserPreferencesRoundTripSelection()
     {
         var root = Path.Combine(Path.GetTempPath(), $"automarker-settings-{Guid.NewGuid():N}");

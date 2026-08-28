@@ -16,9 +16,9 @@
     <Company>AutoMarker Re-ID</Company>
     <Description>Local Windows application for person re-identification and result review.</Description>
     <Copyright>Copyright © 2026 AutoMarker Re-ID</Copyright>
-    <Version>1.0.14</Version>
-    <FileVersion>1.0.14.0</FileVersion>
-    <AssemblyVersion>1.0.14.0</AssemblyVersion>
+    <Version>1.0.15</Version>
+    <FileVersion>1.0.15.0</FileVersion>
+    <AssemblyVersion>1.0.15.0</AssemblyVersion>
     <EnableMsixTooling Condition="'$(StoreBuild)' == 'true'">true</EnableMsixTooling>
     <WindowsPackageType Condition="'$(StoreBuild)' == 'true'">MSIX</WindowsPackageType>
     <PublishAppxPackage Condition="'$(StoreBuild)' == 'true'">true</PublishAppxPackage>

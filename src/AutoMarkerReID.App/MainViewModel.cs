@@ -136,13 +136,25 @@ public sealed partial class MainViewModel : ObservableObject
         RefreshVisibleLog();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRebuildCache))]
     private async Task RebuildCacheAsync()
     {
         if (ConfirmCacheRebuild?.Invoke() == false) return;
-        await _controller.RebuildCacheAsync(null, CancellationToken.None);
-        RefreshQueries();
+        try
+        {
+            await _controller.RebuildCacheAsync(null, CancellationToken.None);
+            RefreshQueries();
+        }
+        catch (Exception exception)
+        {
+            StatusText = exception.Message;
+            StatusColor = "#EF4444";
+            StartupIssueText = exception.Message;
+            SelectionFeedback?.Invoke(this, exception.Message);
+        }
     }
+
+    private bool CanRebuildCache() => _controller.State == AppRuntimeState.Monitoring;
 
     public void RefreshQueries()
     {
@@ -212,6 +224,7 @@ public sealed partial class MainViewModel : ObservableObject
                 AppRuntimeState.Error => "#EF4444",
                 _ => "#F59E0B",
             };
+            RebuildCacheCommand.NotifyCanExecuteChanged();
             if (e.State == AppRuntimeState.Monitoring) RefreshQueries();
             else if (e.State == AppRuntimeState.Error) RefreshStartupHealth(e.Error);
         });
