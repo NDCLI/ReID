@@ -61,12 +61,19 @@ public sealed class QueryCollector(
             var queryIndex = queries.FindIndex(query => query.Id.Equals(targetQueryId, StringComparison.OrdinalIgnoreCase));
             if (queryIndex >= 0)
             {
+                // Adding a reference changes the intra-Query similarity distribution,
+                // so the threshold has to be refitted or it stays pinned to whatever
+                // the Query looked like at its previous size.
                 var updatedReferences = queries[queryIndex].References.Append(reference).ToArray();
-                queries[queryIndex] = queries[queryIndex] with { References = updatedReferences };
+                queries[queryIndex] = queries[queryIndex] with
+                {
+                    References = updatedReferences,
+                    CalibratedThreshold = ThresholdCalibrator.Calibrate(updatedReferences),
+                };
             }
             else
             {
-                queries.Add(new QueryIdentity(targetQueryId, [reference], ReIdDefaults.AiMatchThreshold));
+                queries.Add(new QueryIdentity(targetQueryId, [reference], ThresholdCalibrator.Calibrate([reference])));
             }
 
             catalog.Replace(queries);

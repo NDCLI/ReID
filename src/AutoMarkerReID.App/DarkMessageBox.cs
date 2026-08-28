@@ -24,7 +24,7 @@ public static class DarkMessageBox
             MinHeight = 170,
             ResizeMode = ResizeMode.NoResize,
             ShowInTaskbar = owner is null,
-            WindowStartupLocation = owner is null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen,
             Background = (System.Windows.Media.Brush)System.Windows.Application.Current.Resources["WindowBackgroundBrush"],
             Foreground = (System.Windows.Media.Brush)System.Windows.Application.Current.Resources["TextBrush"],
             Owner = owner is { IsVisible: true } ? owner : null,

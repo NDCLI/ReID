@@ -98,52 +98,10 @@ public sealed class EngineInitializer(
                 }
             }
 
-            rebuilt.Add(query with { References = references, CalibratedThreshold = Calibrate(references) });
+            rebuilt.Add(query with { References = references, CalibratedThreshold = ThresholdCalibrator.Calibrate(references) });
         }
 
         catalog.Replace(rebuilt);
-    }
-
-    private static float Calibrate(List<ReferenceImage> references)
-    {
-        var scores = new List<float>();
-        for (var leftIndex = 0; leftIndex < references.Count; leftIndex++)
-        {
-            for (var rightIndex = leftIndex + 1; rightIndex < references.Count; rightIndex++)
-            {
-                foreach (var model in references[leftIndex].Embeddings.Keys
-                             .Intersect(references[rightIndex].Embeddings.Keys, StringComparer.OrdinalIgnoreCase)
-                             .Where(model => !model.Equals("face", StringComparison.OrdinalIgnoreCase)))
-                {
-                    scores.Add(Dot(references[leftIndex].Embeddings[model], references[rightIndex].Embeddings[model]));
-                }
-            }
-        }
-
-        if (scores.Count == 0)
-        {
-            return ReIdDefaults.AiMatchThreshold;
-        }
-
-        scores.Sort();
-        var index = Math.Clamp((int)Math.Floor((scores.Count - 1) * 0.10), 0, scores.Count - 1);
-        return Math.Clamp(scores[index] - 0.05f, 0.65f, 0.90f);
-    }
-
-    private static float Dot(ReadOnlySpan<float> left, ReadOnlySpan<float> right)
-    {
-        if (left.Length != right.Length)
-        {
-            return 0;
-        }
-
-        float score = 0;
-        for (var index = 0; index < left.Length; index++)
-        {
-            score += left[index] * right[index];
-        }
-
-        return score;
     }
 }
 

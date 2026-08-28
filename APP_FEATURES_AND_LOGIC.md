@@ -159,8 +159,11 @@ Sau khi đọc được ảnh, app chia thành hai nhánh:
 ### 3.8. Review kết quả
 
 - Review mở cả khi có `0` kết quả để người dùng có thể tự thêm khung.
-- Hiển thị ảnh có khung và tự scale vừa cửa sổ.
+- Hiển thị ảnh có khung và tự scale vừa cửa sổ; cửa sổ Review cùng các dialog thông thường luôn mở giữa màn hình.
+- Panel chẩn đoán liệt kê score, ngưỡng, margin, best reference, điểm từng model và lý do nhận/loại của từng card.
+- Slider ngưỡng cho phép chạy nhận diện lại ngay trên ảnh hiện tại; **Ngưỡng gốc** xóa override và quay về calibration của Query.
 - Click trái vào một thẻ để thêm hoặc xóa khung; click vào khoảng trống không tạo khung.
+- **HOÀN TÁC** hoặc `Ctrl+Z` khôi phục lần thêm/xóa khung gần nhất.
 - Chuột phải trong Review thực hiện **Lưu & Copy**.
 - Nút **CẮT / SỬA** mở Image Editor; sau khi sửa, app chạy matching lại để cập nhật tọa độ.
 - `Esc` hoặc **HỦY** đóng mà không lưu.
@@ -170,7 +173,6 @@ Sau khi đọc được ảnh, app chia thành hai nhánh:
   3. Lưu ảnh marked, ảnh original và JSON metadata.
   4. Copy ảnh marked vào Clipboard.
   5. Phát âm thanh thông báo và đóng Review.
-- Review Tk hiện không có Undo/Redo cho thao tác thêm/xóa khung.
 
 Nút **Ảnh chụp** mở thư viện riêng: danh sách ảnh trong `Pictures\Screenshots` nằm bên trái, ảnh mới nhất của phiên cũng được hiển thị, preview fit bên phải và có thể double-click hoặc bấm **Chỉnh sửa**. Ảnh sau chỉnh sửa được lưu thành file PNG mới để giữ ảnh gốc.
 

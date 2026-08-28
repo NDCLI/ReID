@@ -72,9 +72,13 @@ public enum ReviewDecision
     Cancel,
     SaveAndCopy,
     RematchEditedImage,
+    // Re-run recognition on the same image after the user moved the threshold.
+    Rematch,
 }
 
 public sealed record ReviewOutcome(
     ReviewDecision Decision,
     ImageFrame? EditedImage = null,
-    IReadOnlyList<MatchResult>? Matches = null);
+    IReadOnlyList<MatchResult>? Matches = null,
+    float? MatchThresholdOverride = null,
+    bool ResetMatchThreshold = false);

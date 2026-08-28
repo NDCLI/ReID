@@ -45,6 +45,7 @@ public sealed class DirectCaptureCleanupTests
         { ReviewDecision.SaveAndCopy, true },
         { ReviewDecision.Cancel, false },
         { ReviewDecision.RematchEditedImage, false },
+        { ReviewDecision.Rematch, false },
     };
 
     [Theory]

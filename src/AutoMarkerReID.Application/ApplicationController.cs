@@ -230,6 +230,27 @@ public sealed class ApplicationController : BackgroundService
                         continue;
                     }
 
+                    if (outcome.Decision is ReviewDecision.Rematch)
+                    {
+                        if (outcome.ResetMatchThreshold)
+                        {
+                            _selection.MatchThresholdOverride = null;
+                        }
+                        else if (outcome.MatchThresholdOverride is { } threshold)
+                        {
+                            _selection.MatchThresholdOverride = threshold;
+                        }
+
+                        SetState(AppRuntimeState.Processing);
+                        var matches = await _matchEngine.MatchAsync(activeSession.Original, _selection.RecognitionScope, cancellationToken).ConfigureAwait(false);
+                        activeSession = activeSession with
+                        {
+                            Matches = matches,
+                            Explanations = _matchEngine.LastExplanations,
+                        };
+                        continue;
+                    }
+
                     await _reviewCompletion.CompleteAsync(activeSession, outcome, cancellationToken).ConfigureAwait(false);
                     // An edit means output holds the cropped image, so the capture
                     // copy is still the only full-resolution record and is kept.

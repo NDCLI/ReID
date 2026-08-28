@@ -43,7 +43,7 @@ public sealed partial class FileQueryRepository(
                 }
             }
 
-            queries.Add(new QueryIdentity(queryId, references, Calibrate(references)));
+            queries.Add(new QueryIdentity(queryId, references, ThresholdCalibrator.Calibrate(references)));
         }
 
         return queries;
@@ -121,46 +121,6 @@ public sealed partial class FileQueryRepository(
         for (var index = 1; index <= 14; index++)
             Directory.CreateDirectory(Path.Combine(paths.Queries, $"Query_{index}"));
         return Task.CompletedTask;
-    }
-
-    private static float Calibrate(List<ReferenceImage> references)
-    {
-        var scores = new List<float>();
-        for (var leftIndex = 0; leftIndex < references.Count; leftIndex++)
-        {
-            for (var rightIndex = leftIndex + 1; rightIndex < references.Count; rightIndex++)
-            {
-                foreach (var model in references[leftIndex].Embeddings.Keys.Intersect(references[rightIndex].Embeddings.Keys))
-                {
-                    scores.Add(Dot(references[leftIndex].Embeddings[model], references[rightIndex].Embeddings[model]));
-                }
-            }
-        }
-
-        if (scores.Count == 0)
-        {
-            return ReIdDefaults.AiMatchThreshold;
-        }
-
-        scores.Sort();
-        var percentileIndex = Math.Clamp((int)Math.Floor((scores.Count - 1) * 0.10), 0, scores.Count - 1);
-        return Math.Clamp(scores[percentileIndex] - 0.05f, 0.65f, 0.90f);
-    }
-
-    private static float Dot(ReadOnlySpan<float> left, ReadOnlySpan<float> right)
-    {
-        if (left.Length != right.Length || left.Length == 0)
-        {
-            return 0;
-        }
-
-        float result = 0;
-        for (var index = 0; index < left.Length; index++)
-        {
-            result += left[index] * right[index];
-        }
-
-        return result;
     }
 
     private static int NaturalQueryNumber(string path) =>

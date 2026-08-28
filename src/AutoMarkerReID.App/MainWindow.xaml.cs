@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Input;
 using AutoMarkerReID.Application;
 using AutoMarkerReID.Domain;
+using AutoMarkerReID.Inference;
 using AutoMarkerReID.Windows;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
@@ -23,6 +24,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly IClipboardMonitor _clipboardMonitor;
     private readonly IClipboardWriter _clipboardWriter;
     private readonly ICandidateGenerator _candidateGenerator;
+    private readonly QueryCatalog _catalog;
     private readonly UserSelectionState _selection;
     private readonly MainViewModel _viewModel;
     private readonly IImageCodec _codec;
@@ -51,6 +53,7 @@ public partial class MainWindow : Window, IDisposable
         IClipboardMonitor clipboardMonitor,
         IClipboardWriter clipboardWriter,
         ICandidateGenerator candidateGenerator,
+        QueryCatalog catalog,
         UserSelectionState selection,
         IImageCodec codec,
         IInterfaceDetector interfaceDetector,
@@ -65,6 +68,7 @@ public partial class MainWindow : Window, IDisposable
         _clipboardMonitor = clipboardMonitor;
         _clipboardWriter = clipboardWriter;
         _candidateGenerator = candidateGenerator;
+        _catalog = catalog;
         _selection = selection;
         _viewModel = viewModel;
         _codec = codec;
@@ -240,7 +244,7 @@ public partial class MainWindow : Window, IDisposable
             ShowOsd(best is null ? "Không có kết quả đạt ngưỡng" : $"{best.QueryId} · {best.Score:P0}");
             foreach (var diagnostic in ReviewWindow.BuildDiagnostics(args.Session))
                 LogReviewDiagnostic(_logger, diagnostic, null);
-            var review = new ReviewWindow(args.Session, _selection, _codec, _boxRenderer)
+            var review = new ReviewWindow(args.Session, _selection, _codec, _boxRenderer, _catalog.Snapshot)
             {
                 Owner = IsVisible ? this : null,
                 WindowState = WindowState.Normal,

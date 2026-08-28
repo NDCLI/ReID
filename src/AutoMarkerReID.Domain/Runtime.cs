@@ -23,6 +23,7 @@ public static class ReIdDefaults
     public const float TimestampRescueTolerance = 0.01f;
     public const float TimestampRescueBestReferenceThreshold = 0.90f;
     public const int TopReferenceCount = 2;
+    public const int MinCalibrationReferences = 4;
     public const float FaceDetectionThreshold = 0.75f;
     public const int FastMaxRows = 2;
     public const int FastMaxCards = 20;
