@@ -67,7 +67,7 @@ Tạo Setup self-contained:
 
 ```powershell
 $env:Path = 'C:\Program Files\dotnet;' + $env:Path
-.\installer\Build-Setup.ps1 -Version 1.0.12
+.\installer\Build-Setup.ps1 -Version 1.0.13
 ```
 
 File tạo ra nằm tại `artifacts\setup\AutoMarkerReID-Setup-<version>-win-x64.exe`. Có thể truyền `-CertificateThumbprint` hoặc `-PfxPath` để ký Authenticode khi phát hành.

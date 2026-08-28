@@ -203,6 +203,7 @@ public sealed class ApplicationController : BackgroundService
                 break;
             case ProcessingResult.ReviewRequired review:
                 var activeSession = review.Session;
+                var edited = false;
                 while (true)
                 {
                     SetState(AppRuntimeState.Reviewing);
@@ -225,10 +226,18 @@ public sealed class ApplicationController : BackgroundService
                             Matches = matches,
                             Explanations = _matchEngine.LastExplanations,
                         };
+                        edited = true;
                         continue;
                     }
 
                     await _reviewCompletion.CompleteAsync(activeSession, outcome, cancellationToken).ConfigureAwait(false);
+                    // An edit means output holds the cropped image, so the capture
+                    // copy is still the only full-resolution record and is kept.
+                    if (!edited)
+                    {
+                        DirectCaptureCleanupPolicy.TryDeleteSavedCopy(job, outcome, _logger);
+                    }
+
                     break;
                 }
                 break;

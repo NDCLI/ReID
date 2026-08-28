@@ -121,6 +121,7 @@ Sau khi đọc được ảnh, app chia thành hai nhánh:
 - Ảnh chụp được copy vào Clipboard ở nền và được đánh dấu để monitor không xử lý lại chính bản copy này.
 - Ảnh ngang nhưng không phải Re-ID mở Image Editor trước; ảnh Re-ID hoặc ảnh không ngang đi thẳng vào pipeline phân loại.
 - Nếu bật **Lưu ảnh**, ảnh được lưu dạng `ReID_YYYYMMDD_HHMMSS_microseconds.png` vào thư mục Screenshots chuẩn và thư mục Pictures đã redirect nếu Windows trả về một đường dẫn khác.
+- Bản sao trong Screenshots chỉ là bản dự phòng: nó bị xóa ngay khi cùng ảnh đó đã được lưu ở nơi khác — vào `queries/` khi ảnh được thu thập làm Query, hoặc vào `output/` khi người dùng nhấn lưu trong Review. Ảnh bị bỏ qua, Review bị hủy, hoặc ảnh đã chỉnh sửa trước khi lưu (output giữ bản đã cắt, không phải bản chụp gốc) vẫn giữ bản sao Screenshots. Ảnh từ Clipboard, file hoặc dòng lệnh không có bản sao này nên không bị ảnh hưởng.
 
 ### 3.6. Quản lý Query
 
