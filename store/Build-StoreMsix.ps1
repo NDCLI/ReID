@@ -17,6 +17,11 @@ $outputDirectory = Join-Path $repoRoot 'artifacts\store'
 $workRoot = Join-Path ([IO.Path]::GetTempPath()) ("AutoMarkerReID-store-" + [Guid]::NewGuid().ToString('N'))
 $manifestPath = Join-Path $workRoot 'Package.appxmanifest'
 $assetsPath = Join-Path $workRoot 'Assets'
+$storeOriginalProcessorArchitecture = $env:PROCESSOR_ARCHITECTURE
+
+if ([string]::IsNullOrWhiteSpace($storeOriginalProcessorArchitecture)) {
+    $env:PROCESSOR_ARCHITECTURE = 'AMD64'
+}
 
 if ($TestIdentity) {
     $IdentityName = 'Hoakim.AutoMarkerReID.Test'
@@ -132,4 +137,5 @@ finally {
         (Test-Path -LiteralPath $workRoot)) {
         Remove-Item -LiteralPath $workRoot -Recurse -Force
     }
+    $env:PROCESSOR_ARCHITECTURE = $storeOriginalProcessorArchitecture
 }
